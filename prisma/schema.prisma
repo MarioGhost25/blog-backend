@@ -1,0 +1,469 @@
+// ============================================================================
+// ESQUEMA DE PRISMA COMPLETO · BLOG INTERACTIVO ESTUDIANTIL
+// Basado íntegramente en el documento de diseño (Fase 2):
+// - Apéndice B: Esquema de Prisma (págs. 175-188)
+// - Apéndice A: DDL del esquema físico en PostgreSQL 18 (págs. 161-174)
+// - Diccionario de datos: Tablas 11 a 21 (págs. 62-75)
+// - Restricciones CHECK, Claves Foráneas e Índices: Tablas 22 a 24 (págs. 76-81)
+//
+// NOTA IMPORTANTE (Pág. 175 del documento):
+// El Apéndice B original (págs. 175-188) solo incluye los campos escalares y
+// advierte en la pág. 175: "Los campos de relación con @relation deben
+// declararse en Prisma cuando se utilicen consultas relacionales del cliente ORM".
+// Este archivo ya incluye las 21 claves foráneas (@relation) con sus nombres
+// exactos de constraint y acciones ON DELETE (RESTRICT / CASCADE) de la Tabla 23
+// (págs. 77-78) y del Apéndice A (págs. 170-172).
+// ============================================================================
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================================
+// 1. TIPOS ENUMERADOS (7 ENUMS)
+// Referencias:
+// - Tabla 21: Tipos enumerados (pág. 75)
+// - Figura 54: Enumeraciones y objetos de valor (pág. 124)
+// - Apéndice A: CREATE TYPE ... AS ENUM (pág. 161)
+// - Apéndice B: Declaración de enums en Prisma (págs. 175-179)
+// ============================================================================
+
+/// Rol general del usuario en la plataforma (Tabla 21, pág. 75 | Apéndice B, págs. 175-176)
+enum RolGlobal {
+  usuario
+  administrador
+
+  @@map("rol_global")
+}
+
+/// Estado de la cuenta del usuario (Tabla 21, pág. 75 | Apéndice B, pág. 176)
+enum EstadoUsuario {
+  activo
+  suspendido
+
+  @@map("estado_usuario")
+}
+
+/// Rol local dentro de un grupo de estudio (Tabla 21, pág. 75 | Apéndice B, págs. 176-177)
+enum RolGrupo {
+  miembro
+  moderador
+  administrador
+
+  @@map("rol_grupo")
+}
+
+/// Estado de publicaciones y comentarios; retenido = filtro automático (Tabla 21, pág. 75 | Apéndice B, pág. 177)
+enum EstadoContenido {
+  visible
+  retenido
+  eliminado
+
+  @@map("estado_contenido")
+}
+
+/// Tipo de recurso adjunto a una publicación (Tabla 21, pág. 75 | Apéndice B, págs. 177-178)
+enum TipoAdjunto {
+  imagen
+  documento
+  enlace
+
+  @@map("tipo_adjunto")
+}
+
+/// Estado y decisión de un reporte (Tabla 21, pág. 75 | Apéndice B, pág. 178)
+enum EstadoReporte {
+  pendiente
+  desestimado
+  contenido_retirado
+  usuario_suspendido
+
+  @@map("estado_reporte")
+}
+
+/// Tipo de actividad notificada al usuario (Tabla 21, pág. 75 | Apéndice B, págs. 178-179)
+enum TipoNotificacion {
+  comentario
+  respuesta
+  publicacion_grupo
+  resultado_reporte
+  contenido_retirado
+  nuevo_reporte
+
+  @@map("tipo_notificacion")
+}
+
+// ============================================================================
+// 2. MODELOS DE DATOS (10 TABLAS Y 21 RELACIONES)
+// ============================================================================
+
+// ----------------------------------------------------------------------------
+// MODELO 1: Usuario (tabla: usuario)
+// Referencias en el documento:
+// - Diagrama relacional y clases: Figura 17 (pág. 60), Figura 52 (pág. 122)
+// - Diccionario de datos: Tabla 11 (págs. 62-64)
+// - Restricciones CHECK en BD (Tabla 22, pág. 76 | Apéndice A, pág. 163):
+//   * ck_suspension_coherente
+//   * ck_foto_completa
+//   * ck_no_autosuspension
+//   * ck_correo_minusculas
+// - Claves foráneas: Tabla 23 (pág. 77) | Apéndice A (pág. 170)
+// - Índices: Tabla 24 (pág. 79) | Apéndice A (pág. 172)
+// - Esquema Prisma base: Apéndice B (págs. 179-180)
+// ----------------------------------------------------------------------------
+model Usuario {
+  id_usuario        BigInt        @id(map: "pk_usuario") @default(autoincrement())
+  nombre            String        @db.VarChar(80)
+  apellido          String        @db.VarChar(80)
+  correo            String        @unique(map: "uq_usuario_correo") @db.VarChar(254)
+  contrasena_hash   String        @db.VarChar(255)
+  carrera           String?       @db.VarChar(100)
+  universidad       String?       @db.VarChar(120)
+  biografia         String?       @db.VarChar(500)
+  foto_url          String?       @db.VarChar(1024)
+  foto_public_id    String?       @db.VarChar(255)
+  rol               RolGlobal     @default(usuario)
+  estado            EstadoUsuario @default(activo)
+  suspendido_hasta  DateTime?     @db.Timestamptz(6)
+  motivo_suspension String?       @db.VarChar(500)
+  suspendido_por    BigInt?
+  fecha_registro    DateTime      @default(now()) @db.Timestamptz(6)
+
+  // FK #1: Relación reflexiva de suspensión (Tabla 23, pág. 77 | Apéndice A, pág. 170)
+  admin_suspensor      Usuario?  @relation("UsuarioSuspension", fields: [suspendido_por], references: [id_usuario], onDelete: Restrict, onUpdate: NoAction, map: "fk_usuario_suspendido_por")
+  usuarios_suspendidos Usuario[] @relation("UsuarioSuspension")
+
+  // Relaciones inversas hacia las demás tablas del modelo
+  tokens_recuperacion TokenRecuperacion[]
+  grupos_creados      GrupoEstudio[]      @relation("CreadorGrupo")
+  membresias_grupo    MiembroGrupo[]
+  publicaciones       Publicacion[]       @relation("AutorPublicacion")
+  comentarios         Comentario[]        @relation("AutorComentario")
+  reportes_realizados Reporte[]           @relation("ReportanteReporte")
+  reportes_moderados  Reporte[]           @relation("ModeradorReporte")
+  notificaciones      Notificacion[]      @relation("DestinatarioNotificacion")
+
+  // Índice para reactivación programada de cuentas vencidas (Tabla 24, pág. 79)
+  @@index([estado, suspendido_hasta], map: "ix_usuario_suspension")
+  @@map("usuario")
+}
+
+// ----------------------------------------------------------------------------
+// MODELO 2: TokenRecuperacion (tabla: token_recuperacion)
+// Referencias en el documento:
+// - Diagrama relacional y clases: Figura 17 (pág. 60), Figura 52 (pág. 122)
+// - Diccionario de datos: Tabla 12 (págs. 64-65)
+// - Claves foráneas: Tabla 23 (pág. 77) | Apéndice A (pág. 170)
+// - Índices: Tabla 24 (pág. 79) | Apéndice A (pág. 173)
+// - Esquema Prisma base: Apéndice B (págs. 180-181)
+// ----------------------------------------------------------------------------
+model TokenRecuperacion {
+  id_token         BigInt    @id(map: "pk_token_recuperacion") @default(autoincrement())
+  id_usuario       BigInt
+  token_hash       String    @unique(map: "uq_token_hash") @db.VarChar(255)
+  fecha_expiracion DateTime  @db.Timestamptz(6)
+  fecha_uso        DateTime? @db.Timestamptz(6)
+
+  // FK #2: Usuario que solicitó la recuperación (Tabla 23, pág. 77 | Apéndice A, pág. 170)
+  usuario Usuario @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade, onUpdate: NoAction, map: "fk_token_recuperacion_usuario")
+
+  // Índice para invalidar tokens previos del usuario (Tabla 24, pág. 79)
+  @@index([id_usuario], map: "ix_token_usuario")
+  @@map("token_recuperacion")
+}
+
+// ----------------------------------------------------------------------------
+// MODELO 3: Categoria (tabla: categoria)
+// Referencias en el documento:
+// - Diagrama relacional y clases: Figura 17 (pág. 60), Figura 52 (pág. 122)
+// - Diccionario de datos: Tabla 13 (pág. 65)
+// - Índices: Tabla 24 (pág. 79) | Apéndice A (pág. 164)
+// - Esquema Prisma base: Apéndice B (pág. 181)
+// ----------------------------------------------------------------------------
+model Categoria {
+  id_categoria BigInt  @id(map: "pk_categoria") @default(autoincrement())
+  nombre       String  @unique(map: "uq_categoria_nombre") @db.VarChar(80)
+  descripcion  String? @db.VarChar(255)
+
+  // Relaciones inversas (clasifica publicaciones y define la materia de grupos)
+  grupos_estudio GrupoEstudio[]
+  publicaciones  Publicacion[]
+
+  @@map("categoria")
+}
+
+// ----------------------------------------------------------------------------
+// MODELO 4: Publicacion (tabla: publicacion)
+// Referencias en el documento:
+// - Diagrama relacional y clases: Figura 17 (pág. 60), Figura 52 (pág. 122)
+// - Diccionario de datos: Tabla 14 (págs. 66-67)
+// - Restricciones CHECK en BD (Tabla 22, pág. 76 | Apéndice A, pág. 166):
+//   * ck_publicacion_titulo: char_length(titulo) BETWEEN 3 AND 150
+//   * ck_publicacion_version: version >= 1
+// - Columna generada en BD (Tabla 10, pág. 57 | Apéndice A, pág. 166):
+//   * busqueda TSVECTOR GENERATED ALWAYS AS (to_tsvector('spanish', titulo || ' ' || contenido)) STORED
+// - Claves foráneas: Tabla 23 (pág. 77) | Apéndice A (pág. 171)
+// - Índices: Tabla 24 (pág. 79) | Apéndice A (pág. 173)
+// - Esquema Prisma base: Apéndice B (págs. 181-182)
+// ----------------------------------------------------------------------------
+model Publicacion {
+  id_publicacion BigInt                   @id(map: "pk_publicacion") @default(autoincrement())
+  id_autor       BigInt
+  id_categoria   BigInt
+  id_grupo       BigInt?
+  titulo         String                   @db.VarChar(150)
+  contenido      String                   @db.Text
+  estado         EstadoContenido          @default(visible)
+  version        Int                      @default(1)
+  fecha_creacion DateTime                 @default(now()) @db.Timestamptz(6)
+  fecha_edicion  DateTime?                @db.Timestamptz(6)
+  busqueda       Unsupported("tsvector")?
+
+  // FK #3, #4 y #5: Autor, Categoría y Grupo opcional (Tabla 23, pág. 77 | Apéndice A, pág. 171)
+  autor     Usuario       @relation("AutorPublicacion", fields: [id_autor], references: [id_usuario], onDelete: Restrict, onUpdate: NoAction, map: "fk_publicacion_autor")
+  categoria Categoria     @relation(fields: [id_categoria], references: [id_categoria], onDelete: Restrict, onUpdate: NoAction, map: "fk_publicacion_categoria")
+  grupo     GrupoEstudio? @relation(fields: [id_grupo], references: [id_grupo], onDelete: Restrict, onUpdate: NoAction, map: "fk_publicacion_grupo")
+
+  // Relaciones inversas
+  adjuntos       Adjunto[]
+  comentarios    Comentario[]
+  reportes       Reporte[]
+  notificaciones Notificacion[]
+
+  // Índices B-tree (Tabla 24, pág. 79 | Apéndice B, pág. 182)
+  // Nota: El índice GIN ix_publicacion_busqueda sobre "busqueda" se define en el DDL SQL (Apéndice A, pág. 173)
+  @@index([id_categoria, estado, fecha_creacion], map: "ix_publicacion_categoria")
+  @@index([id_grupo, estado, fecha_creacion], map: "ix_publicacion_grupo")
+  @@index([id_autor, fecha_creacion], map: "ix_publicacion_autor")
+  @@map("publicacion")
+}
+
+// ----------------------------------------------------------------------------
+// MODELO 5: Adjunto (tabla: adjunto)
+// Referencias en el documento:
+// - Diagrama relacional y clases: Figura 17 (pág. 60), Figura 52 (pág. 122)
+// - Diccionario de datos: Tabla 15 (págs. 67-68)
+// - Restricciones CHECK en BD (Tabla 22, pág. 76 | Apéndice A, pág. 167):
+//   * ck_archivo_en_cloudinary: tipo = 'enlace' OR cloudinary_public_id IS NOT NULL
+//   * ck_adjunto_orden: orden >= 1
+// - Claves foráneas: Tabla 23 (pág. 77) | Apéndice A (pág. 171)
+// - Índices: Tabla 24 (pág. 80) | Apéndice A (pág. 167)
+// - Esquema Prisma base: Apéndice B (págs. 182-183)
+// ----------------------------------------------------------------------------
+model Adjunto {
+  id_adjunto           BigInt      @id(map: "pk_adjunto") @default(autoincrement())
+  id_publicacion       BigInt
+  tipo                 TipoAdjunto
+  titulo               String      @db.VarChar(150)
+  url                  String      @db.VarChar(1024)
+  cloudinary_public_id String?     @db.VarChar(255)
+  orden                Int         @default(1)
+
+  // FK #6: Publicación a la que pertenece el adjunto (Tabla 23, pág. 77 | Apéndice A, pág. 171)
+  publicacion Publicacion @relation(fields: [id_publicacion], references: [id_publicacion], onDelete: Cascade, onUpdate: NoAction, map: "fk_adjunto_publicacion")
+
+  // Unicidad de posición del adjunto por publicación (Tabla 24, pág. 80 | Apéndice B, pág. 183)
+  @@unique([id_publicacion, orden], map: "uq_adjunto_orden")
+  @@map("adjunto")
+}
+
+// ----------------------------------------------------------------------------
+// MODELO 6: Comentario (tabla: comentario)
+// Referencias en el documento:
+// - Diagrama relacional y clases: Figura 17 (pág. 60), Figura 52 (pág. 122)
+// - Diccionario de datos: Tabla 16 (págs. 68-69)
+// - Restricciones CHECK en BD (Tabla 22, pág. 76 | Apéndice A, pág. 168):
+//   * ck_no_autorespuesta: id_comentario_padre IS NULL OR id_comentario_padre <> id_comentario
+// - Claves foráneas: Tabla 23 (pág. 78) | Apéndice A (pág. 171)
+// - Índices: Tabla 24 (pág. 80) | Apéndice A (pág. 173)
+// - Esquema Prisma base: Apéndice B (págs. 183-184)
+// ----------------------------------------------------------------------------
+model Comentario {
+  id_comentario       BigInt          @id(map: "pk_comentario") @default(autoincrement())
+  id_publicacion      BigInt
+  id_autor            BigInt
+  id_comentario_padre BigInt?
+  contenido           String          @db.VarChar(2000)
+  estado              EstadoContenido @default(visible)
+  fecha_creacion      DateTime        @default(now()) @db.Timestamptz(6)
+
+  // FK #7: Publicación comentada (Tabla 23, pág. 78 | Apéndice A, pág. 171)
+  publicacion Publicacion @relation(fields: [id_publicacion], references: [id_publicacion], onDelete: Cascade, onUpdate: NoAction, map: "fk_comentario_publicacion")
+
+  // FK #8: Usuario autor del comentario (Tabla 23, pág. 78 | Apéndice A, pág. 171)
+  autor Usuario @relation("AutorComentario", fields: [id_autor], references: [id_usuario], onDelete: Restrict, onUpdate: NoAction, map: "fk_comentario_autor")
+
+  // FK #9: Clave foránea compuesta reflexiva (Tabla 9, pág. 56 | Tabla 23, pág. 78 | Apéndice A, pág. 171)
+  // Garantiza que una respuesta apunte siempre a un comentario de la MISMA publicación
+  comentario_padre Comentario?  @relation("HiloComentarios", fields: [id_comentario_padre, id_publicacion], references: [id_comentario, id_publicacion], onDelete: Cascade, onUpdate: NoAction, map: "fk_comentario_comentario_padre_publicacion")
+  respuestas       Comentario[] @relation("HiloComentarios")
+
+  // Relaciones inversas
+  reportes       Reporte[]
+  notificaciones Notificacion[]
+
+  // Unicidad compuesta e índices (Tabla 24, pág. 80 | Apéndice B, pág. 184)
+  @@unique([id_comentario, id_publicacion], map: "uq_comentario_publicacion")
+  @@index([id_publicacion, fecha_creacion], map: "ix_comentario_publicacion")
+  @@index([id_comentario_padre], map: "ix_comentario_padre")
+  @@index([id_autor], map: "ix_comentario_autor")
+  @@map("comentario")
+}
+
+// ----------------------------------------------------------------------------
+// MODELO 7: GrupoEstudio (tabla: grupo_estudio)
+// Referencias en el documento:
+// - Diagrama relacional y clases: Figura 18 (pág. 61), Figura 53 (pág. 123)
+// - Diccionario de datos: Tabla 17 (pág. 70)
+// - Claves foráneas: Tabla 23 (pág. 78) | Apéndice A (pág. 170)
+// - Índices: Tabla 24 (pág. 80) | Apéndice A (pág. 173)
+// - Esquema Prisma base: Apéndice B (págs. 184-185)
+// ----------------------------------------------------------------------------
+model GrupoEstudio {
+  id_grupo       BigInt   @id(map: "pk_grupo_estudio") @default(autoincrement())
+  id_categoria   BigInt
+  id_creador     BigInt
+  nombre         String   @db.VarChar(100)
+  descripcion    String?  @db.VarChar(1000)
+  fecha_creacion DateTime @default(now()) @db.Timestamptz(6)
+
+  // FK #10: Materia/Categoría del grupo (Tabla 23, pág. 78 | Apéndice A, pág. 170)
+  categoria Categoria @relation(fields: [id_categoria], references: [id_categoria], onDelete: Restrict, onUpdate: NoAction, map: "fk_grupo_estudio_categoria")
+
+  // FK #11: Usuario creador del grupo (Tabla 23, pág. 78 | Apéndice A, pág. 170)
+  creador Usuario @relation("CreadorGrupo", fields: [id_creador], references: [id_usuario], onDelete: Restrict, onUpdate: NoAction, map: "fk_grupo_estudio_creador")
+
+  // Relaciones inversas
+  miembros      MiembroGrupo[]
+  publicaciones Publicacion[]
+
+  // Índices (Tabla 24, pág. 80 | Apéndice B, pág. 185)
+  @@index([id_categoria], map: "ix_grupo_categoria")
+  @@index([id_creador], map: "ix_grupo_creador")
+  @@map("grupo_estudio")
+}
+
+// ----------------------------------------------------------------------------
+// MODELO 8: MiembroGrupo (tabla: miembro_grupo)
+// Referencias en el documento:
+// - Diagrama relacional y clases: Figura 18 (pág. 61), Figura 53 (pág. 123)
+// - Diccionario de datos: Tabla 18 (pág. 71)
+// - Claves foráneas: Tabla 23 (pág. 78) | Apéndice A (pág. 171)
+// - Índices: Tabla 24 (pág. 80) | Apéndice A (pág. 173)
+// - Esquema Prisma base: Apéndice B (pág. 185)
+// ----------------------------------------------------------------------------
+model MiembroGrupo {
+  id_grupo    BigInt
+  id_usuario  BigInt
+  rol         RolGrupo @default(miembro)
+  fecha_union DateTime @default(now()) @db.Timestamptz(6)
+
+  // FK #12: Grupo de estudio (Tabla 23, pág. 78 | Apéndice A, pág. 171)
+  grupo GrupoEstudio @relation(fields: [id_grupo], references: [id_grupo], onDelete: Cascade, onUpdate: NoAction, map: "fk_miembro_grupo_grupo")
+
+  // FK #13: Usuario miembro (Tabla 23, pág. 78 | Apéndice A, pág. 171)
+  usuario Usuario @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade, onUpdate: NoAction, map: "fk_miembro_grupo_usuario")
+
+  // Clave primaria compuesta e índice por usuario (Tabla 18, pág. 71 | Tabla 24, pág. 80)
+  @@id([id_grupo, id_usuario], map: "pk_miembro_grupo")
+  @@index([id_usuario], map: "ix_miembro_usuario")
+  @@map("miembro_grupo")
+}
+
+// ----------------------------------------------------------------------------
+// MODELO 9: Reporte (tabla: reporte)
+// Referencias en el documento:
+// - Diagrama relacional y clases: Figura 18 (pág. 61), Figura 53 (pág. 123)
+// - Diccionario de datos: Tabla 19 (págs. 71-73)
+// - Restricciones CHECK en BD (Tabla 22, págs. 76-77 | Apéndice A, pág. 169):
+//   * ck_reporte_un_objetivo: (id_publicacion IS NULL) <> (id_comentario IS NULL)
+//   * ck_reporte_resuelto: coherencia entre estado, id_moderador y fecha_resolucion
+// - Claves foráneas: Tabla 23 (pág. 78) | Apéndice A (pág. 172)
+// - Índices: Tabla 24 (págs. 80-81) | Apéndice A (pág. 173)
+// - Esquema Prisma base: Apéndice B (págs. 186-187)
+// ----------------------------------------------------------------------------
+model Reporte {
+  id_reporte       BigInt        @id(map: "pk_reporte") @default(autoincrement())
+  id_reportante    BigInt
+  id_publicacion   BigInt?
+  id_comentario    BigInt?
+  motivo           String        @db.VarChar(500)
+  estado           EstadoReporte @default(pendiente)
+  id_moderador     BigInt?
+  observacion      String?       @db.VarChar(1000)
+  fecha_creacion   DateTime      @default(now()) @db.Timestamptz(6)
+  fecha_resolucion DateTime?     @db.Timestamptz(6)
+
+  // FK #14: Usuario que reporta (Tabla 23, pág. 78 | Apéndice A, pág. 172)
+  reportante Usuario @relation("ReportanteReporte", fields: [id_reportante], references: [id_usuario], onDelete: Restrict, onUpdate: NoAction, map: "fk_reporte_reportante")
+
+  // FK #15: Moderador o administrador que resolvió (Tabla 23, pág. 78 | Apéndice A, pág. 172)
+  moderador Usuario? @relation("ModeradorReporte", fields: [id_moderador], references: [id_usuario], onDelete: Restrict, onUpdate: NoAction, map: "fk_reporte_moderador")
+
+  // FK #16: Publicación reportada (Tabla 23, pág. 78 | Apéndice A, pág. 172)
+  publicacion Publicacion? @relation(fields: [id_publicacion], references: [id_publicacion], onDelete: Cascade, onUpdate: NoAction, map: "fk_reporte_publicacion")
+
+  // FK #17: Comentario reportado (Tabla 23, pág. 78 | Apéndice A, pág. 172)
+  comentario Comentario? @relation(fields: [id_comentario], references: [id_comentario], onDelete: Cascade, onUpdate: NoAction, map: "fk_reporte_comentario")
+
+  // Relación inversa
+  notificaciones Notificacion[]
+
+  // Unicidad para evitar reportes duplicados del mismo usuario y cola de reportes (Tabla 24, págs. 80-81 | Apéndice B, págs. 186-187)
+  @@unique([id_reportante, id_publicacion], map: "uq_reporte_publicacion")
+  @@unique([id_reportante, id_comentario], map: "uq_reporte_comentario")
+  @@index([estado, fecha_creacion], map: "ix_reporte_estado")
+  @@index([id_publicacion], map: "ix_reporte_publicacion")
+  @@index([id_comentario], map: "ix_reporte_comentario")
+  @@index([id_moderador], map: "ix_reporte_moderador")
+  @@map("reporte")
+}
+
+// ----------------------------------------------------------------------------
+// MODELO 10: Notificacion (tabla: notificacion)
+// Referencias en el documento:
+// - Diagrama relacional y clases: Figura 18 (pág. 61), Figura 53 (pág. 123)
+// - Diccionario de datos: Tabla 20 (págs. 73-75)
+// - Restricciones CHECK en BD (Tabla 22, pág. 77 | Apéndice A, pág. 170):
+//   * ck_notificacion_una_referencia: num_nonnulls(id_publicacion, id_comentario, id_reporte) = 1
+//   * ck_notificacion_tipo: coherencia entre el enum tipo y la referencia no nula
+// - Claves foráneas: Tabla 23 (pág. 78) | Apéndice A (pág. 172)
+// - Índices: Tabla 24 (pág. 81) | Apéndice A (págs. 173-174)
+// - Esquema Prisma base: Apéndice B (págs. 187-188)
+// ----------------------------------------------------------------------------
+model Notificacion {
+  id_notificacion BigInt           @id(map: "pk_notificacion") @default(autoincrement())
+  id_destinatario BigInt
+  tipo            TipoNotificacion
+  mensaje         String           @db.VarChar(255)
+  id_publicacion  BigInt?
+  id_comentario   BigInt?
+  id_reporte      BigInt?
+  fecha_creacion  DateTime         @default(now()) @db.Timestamptz(6)
+  fecha_lectura   DateTime?        @db.Timestamptz(6)
+
+  // FK #18: Usuario destinatario (Tabla 23, pág. 78 | Apéndice A, pág. 172)
+  destinatario Usuario @relation("DestinatarioNotificacion", fields: [id_destinatario], references: [id_usuario], onDelete: Cascade, onUpdate: NoAction, map: "fk_notificacion_destinatario")
+
+  // FK #19: Publicación relacionada (Tabla 23, pág. 78 | Apéndice A, pág. 172)
+  publicacion Publicacion? @relation(fields: [id_publicacion], references: [id_publicacion], onDelete: Cascade, onUpdate: NoAction, map: "fk_notificacion_publicacion")
+
+  // FK #20: Comentario relacionado (Tabla 23, pág. 78 | Apéndice A, pág. 172)
+  comentario Comentario? @relation(fields: [id_comentario], references: [id_comentario], onDelete: Cascade, onUpdate: NoAction, map: "fk_notificacion_comentario")
+
+  // FK #21: Reporte relacionado (Tabla 23, pág. 78 | Apéndice A, pág. 172)
+  reporte Reporte? @relation(fields: [id_reporte], references: [id_reporte], onDelete: Cascade, onUpdate: NoAction, map: "fk_notificacion_reporte")
+
+  // Índices de bandeja y borrado en cascada (Tabla 24, pág. 81 | Apéndice B, págs. 187-188)
+  @@index([id_destinatario, fecha_lectura, fecha_creacion], map: "ix_notificacion_bandeja")
+  @@index([id_publicacion], map: "ix_notificacion_publicacion")
+  @@index([id_comentario], map: "ix_notificacion_comentario")
+  @@index([id_reporte], map: "ix_notificacion_reporte")
+  @@map("notificacion")
+}
