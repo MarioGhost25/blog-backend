@@ -11,6 +11,10 @@ export class PrismaService
   constructor(configService: ConfigService) {
     const adapter = new PrismaPg({
       connectionString: configService.getOrThrow<string>('DATABASE_URL'),
+      // Heroku Postgres requires TLS and uses self-signed certificates.
+      ...(configService.get<string>('DYNO')
+        ? { ssl: { rejectUnauthorized: false } }
+        : {}),
     });
     super({ adapter });
   }
