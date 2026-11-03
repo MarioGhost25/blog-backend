@@ -2,14 +2,14 @@ import type { RolGlobal, EstadoUsuario } from '@prisma/client';
 
 export interface JwtPayload {
   sub: string;
-  rol: RolGlobal;
-  estado: EstadoUsuario;
+  role: RolGlobal;
+  status: EstadoUsuario;
   iat?: number;
   exp?: number;
 }
 
-export interface UsuarioActual {
+export interface AuthenticatedUser {
   id: bigint;
-  rol: RolGlobal;
-  estado: EstadoUsuario;
+  role: RolGlobal;
+  status: EstadoUsuario;
 }

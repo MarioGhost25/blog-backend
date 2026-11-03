@@ -29,7 +29,12 @@ async function bootstrap(): Promise<void> {
       transform: true,
     }),
   );
-  await app.listen(process.env.PORT ?? 3000);
+  try {
+    await app.listen(process.env.PORT ?? 3000);
+  } catch (error: unknown) {
+    await app.close();
+    throw error;
+  }
 }
 
 bootstrap().catch((error: unknown) => {

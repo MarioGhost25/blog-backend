@@ -8,7 +8,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { AuthRepository } from './auth.repository';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { obtenerJwtSecret } from './jwt.config';
+
 
 @Module({
   imports: [
@@ -19,7 +19,7 @@ import { obtenerJwtSecret } from './jwt.config';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        secret: obtenerJwtSecret(config),
+        secret: config.getOrThrow<string>('JWT_SECRET'),
         signOptions: { expiresIn: '60m', algorithm: 'HS256' },
       }),
     }),
