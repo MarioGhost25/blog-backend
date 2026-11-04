@@ -4,6 +4,8 @@ import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module';
 import { joiValidationSchema } from './config/joi.validation';
+import { CategoriesModule } from './categories/categories.module';
+import { GroupsModule } from './groups/groups.module';
 
 @Module({
   imports: [
@@ -12,6 +14,8 @@ import { joiValidationSchema } from './config/joi.validation';
       validationSchema: joiValidationSchema,
     }),
     AuthModule,
+    CategoriesModule,
+    GroupsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
