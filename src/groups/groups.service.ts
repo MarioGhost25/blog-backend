@@ -12,7 +12,7 @@ import { GroupsRepository } from './groups.repository';
 import { CreateGroupDto } from './dto/create-group.dto';
 import { FilterGroupsDto, MemberFiltersDto } from './dto/filter-groups.dto';
 import { TransferAdminDto } from './dto/transfer-admin.dto';
-import { parseGroupId } from './group-id';
+import { parseGroupId } from './utils/group-id';
 
 @Injectable()
 export class GroupsService {
@@ -22,11 +22,11 @@ export class GroupsService {
   ) {}
 
   async create(dto: CreateGroupDto, user: AuthenticatedUser) {
-    const idCategoria = parseGroupId(dto.idCategoria);
+    const idCategoria = parseGroupId(dto.categoryId);
     await this.categories.ensureCategoryExists(idCategoria);
     return this.repository.createGroupWithAdmin({
-      nombre: dto.nombre,
-      descripcion: dto.descripcion,
+      nombre: dto.name,
+      descripcion: dto.description,
       idCategoria,
       idCreador: user.id,
     });
@@ -35,11 +35,13 @@ export class GroupsService {
   findAll(filters: FilterGroupsDto, user: AuthenticatedUser) {
     return this.repository.findAllCursor(
       {
-        ...filters,
+        q: filters.q,
+        limite: filters.limit,
+        mios: filters.mine,
         categoria:
-          filters.categoria == null
+          filters.categoryId == null
             ? undefined
-            : parseGroupId(filters.categoria),
+            : parseGroupId(filters.categoryId),
         cursor:
           filters.cursor == null ? undefined : parseGroupId(filters.cursor),
       },
@@ -49,7 +51,7 @@ export class GroupsService {
 
   async findOne(groupId: bigint, user: AuthenticatedUser) {
     const group = await this.repository.findByIdWithRole(groupId, user.id);
-    if (!group) throw new NotFoundException('El grupo no existe');
+    if (!group) throw new NotFoundException('Group not found');
     return group;
   }
 
@@ -59,7 +61,9 @@ export class GroupsService {
         groupId,
         async (repository) => {
           if (await repository.findMembership(groupId, user.id))
-            throw new ConflictException('Ya eres miembro de este grupo');
+            throw new ConflictException(
+              'You are already a member of this group',
+            );
           return repository.addMember(groupId, user.id);
         },
       );
@@ -68,7 +72,7 @@ export class GroupsService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
       )
-        throw new ConflictException('Ya eres miembro de este grupo');
+        throw new ConflictException('You are already a member of this group');
       throw error;
     }
   }
@@ -79,7 +83,7 @@ export class GroupsService {
         repository,
         groupId,
         user.id,
-        'Eres el único administrador; transfiere la administración antes de salir',
+        'You are the only administrator; transfer administration before leaving',
       );
       await repository.removeMember(groupId, user.id);
     });
@@ -92,12 +96,12 @@ export class GroupsService {
   ) {
     return this.repository.withGroupLock(groupId, async (repository) => {
       if (!(await repository.findMembership(groupId, user.id)))
-        throw new ForbiddenException('Debes ser miembro del grupo');
+        throw new ForbiddenException('You must be a member of this group');
       return repository.listMembersCursor(
         groupId,
         filters.q,
         filters.cursor == null ? undefined : parseGroupId(filters.cursor),
-        filters.limite,
+        filters.limit,
       );
     });
   }
@@ -111,14 +115,14 @@ export class GroupsService {
     return this.repository.withGroupLock(groupId, async (repository) => {
       await this.ensureAdmin(repository, groupId, actor);
       const member = await repository.findMembership(groupId, userId);
-      if (!member) throw new NotFoundException('El integrante no existe');
+      if (!member) throw new NotFoundException('Member not found');
       if (
         member.rol === RolGrupo.administrador &&
         rol !== RolGrupo.administrador &&
         (await repository.countAdmins(groupId)) <= 1
       )
         throw new ConflictException(
-          'El grupo no puede quedar sin administrador',
+          'The group must have at least one administrator',
         );
       return repository.updateMemberRole(groupId, userId, rol);
     });
@@ -135,7 +139,7 @@ export class GroupsService {
         repository,
         groupId,
         userId,
-        'El grupo no puede quedar sin administrador',
+        'The group must have at least one administrator',
       );
       await repository.removeMember(groupId, userId);
     });
@@ -146,16 +150,16 @@ export class GroupsService {
     dto: TransferAdminDto,
     actor: AuthenticatedUser,
   ): Promise<void> {
-    const newAdminId = parseGroupId(dto.idNuevoAdministrador);
+    const newAdminId = parseGroupId(dto.newAdministratorId);
     if (newAdminId === actor.id)
       throw new BadRequestException(
-        'No puedes transferirte la administración a ti mismo',
+        'You cannot transfer administration to yourself',
       );
     await this.repository.transferAdminTransaction(
       groupId,
       actor.id,
       newAdminId,
-      dto.salir,
+      dto.leave,
     );
   }
 
@@ -170,7 +174,9 @@ export class GroupsService {
       (await repository.findMembership(groupId, actor.id))?.rol !==
         RolGrupo.administrador
     )
-      throw new ForbiddenException();
+      throw new ForbiddenException(
+        'You must be a group administrator or global administrator to manage members',
+      );
   }
 
   private async ensureCanRemove(
@@ -180,7 +186,7 @@ export class GroupsService {
     message: string,
   ): Promise<void> {
     const member = await repository.findMembership(groupId, userId);
-    if (!member) throw new NotFoundException('El integrante no existe');
+    if (!member) throw new NotFoundException('Member not found');
     if (
       member.rol === RolGrupo.administrador &&
       (await repository.countAdmins(groupId)) <= 1

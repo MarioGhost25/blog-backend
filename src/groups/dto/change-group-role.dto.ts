@@ -1,6 +1,6 @@
 import { IsEnum } from 'class-validator';
-import { RolGrupo } from '@prisma/client';
+import { GroupRole } from '../types/group-role';
 
 export class ChangeGroupRoleDto {
-  @IsEnum(RolGrupo) rol!: RolGrupo;
+  @IsEnum(GroupRole) role!: GroupRole;
 }

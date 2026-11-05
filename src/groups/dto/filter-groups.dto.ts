@@ -7,20 +7,20 @@ import {
   Max,
   Min,
 } from 'class-validator';
-import { IsGroupId } from '../group-id';
+import { IsGroupId } from '../validators/is-group-id.validator';
 
 export class MemberFiltersDto {
   @IsOptional() @IsString() q?: string;
   @IsOptional() @IsString() @IsGroupId() cursor?: string;
-  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(50) limite?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(50) limit?: number;
 }
 
 export class FilterGroupsDto extends MemberFiltersDto {
-  @IsOptional() @IsGroupId() categoria?: string | number;
+  @IsOptional() @IsGroupId() categoryId?: string | number;
   @IsOptional()
   @Transform(({ value }: { value: unknown }) =>
     value === 'true' ? true : value === 'false' ? false : value,
   )
   @IsBoolean()
-  mios?: boolean;
+  mine?: boolean;
 }

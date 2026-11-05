@@ -1,8 +1,9 @@
-import { Logger, ValidationPipe } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { createApiValidationPipe } from './common/validation/api-validation.pipe';
 
 Object.defineProperty(BigInt.prototype, 'toJSON', {
   configurable: true,
@@ -22,13 +23,7 @@ async function bootstrap(): Promise<void> {
     origin: process.env.FRONTEND_URL ?? 'http://localhost:3000',
     credentials: true,
   });
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
+  app.useGlobalPipes(createApiValidationPipe());
   try {
     await app.listen(process.env.PORT ?? 3000);
   } catch (error: unknown) {

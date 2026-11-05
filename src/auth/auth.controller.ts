@@ -13,11 +13,16 @@ import { Public } from './decorators/public.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { clearJwtCookie, setJwtCookie } from './security/cookie.helper';
 import type { AuthenticatedUser } from './types/auth.types';
-import type { UserProfile } from './auth.repository';
+import { toUserProfileResponse } from './types/user-profile.response';
+import type { UserProfileResponse } from './types/user-profile.response';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { ForgotPasswordDto, LoginDto, RegisterDto, ResetPasswordDto } from './dto';
-
+import {
+  ForgotPasswordDto,
+  LoginDto,
+  RegisterDto,
+  ResetPasswordDto,
+} from './dto';
 
 @Controller('auth')
 @UseGuards(JwtAuthGuard)
@@ -27,8 +32,8 @@ export class AuthController {
   @Public()
   @Post('register')
   @HttpCode(201)
-  register(@Body() dto: RegisterDto): Promise<UserProfile> {
-    return this.authService.register(dto);
+  async register(@Body() dto: RegisterDto): Promise<UserProfileResponse> {
+    return toUserProfileResponse(await this.authService.register(dto));
   }
 
   @Public()
@@ -37,10 +42,10 @@ export class AuthController {
   async login(
     @Body() dto: LoginDto,
     @Res({ passthrough: true }) res: Response,
-  ): Promise<UserProfile> {
+  ): Promise<UserProfileResponse> {
     const { token, user } = await this.authService.login(dto);
     setJwtCookie(res, token);
-    return user;
+    return toUserProfileResponse(user);
   }
 
   @Public()
@@ -58,7 +63,8 @@ export class AuthController {
   ): Promise<{ message: string }> {
     await this.authService.forgotPassword(dto.email);
     return {
-      message: 'If the account exists, password reset instructions will be provided.',
+      message:
+        'If the account exists, password reset instructions will be provided.',
     };
   }
 
@@ -69,11 +75,12 @@ export class AuthController {
     return this.authService.resetPassword(dto);
   }
 
-
   @Get('me')
-  getCurrentProfile(
+  async getCurrentProfile(
     @CurrentUser() user: AuthenticatedUser,
-  ): Promise<UserProfile> {
-    return this.authService.getCurrentProfile(user.id);
+  ): Promise<UserProfileResponse> {
+    return toUserProfileResponse(
+      await this.authService.getCurrentProfile(user.id),
+    );
   }
 }

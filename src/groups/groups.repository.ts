@@ -79,7 +79,7 @@ export class GroupsRepository {
         const rows = await tx.$queryRaw<
           { id_grupo: bigint }[]
         >`SELECT id_grupo FROM grupo_estudio WHERE id_grupo = ${groupId} FOR UPDATE`;
-        if (!rows.length) throw new NotFoundException('El grupo no existe');
+        if (!rows.length) throw new NotFoundException('Group not found');
         const scoped = new GroupsRepository(this.prisma);
         scoped.transaction = tx;
         return work(scoped);
@@ -247,16 +247,16 @@ export class GroupsRepository {
     await this.withGroupLock(groupId, async (repository) => {
       if (currentAdminId === newAdminId)
         throw new BadRequestException(
-          'No puedes transferirte la administración a ti mismo',
+          'You cannot transfer administration to yourself',
         );
       const current = await repository.findMembership(groupId, currentAdminId);
       if (current?.rol !== RolGrupo.administrador)
         throw new ForbiddenException(
-          'Debes ser administrador actual del grupo',
+          'You must currently be an administrator of this group; global administrator status alone does not allow transfer',
         );
       if (!(await repository.findMembership(groupId, newAdminId)))
         throw new BadRequestException(
-          'El nuevo administrador debe pertenecer al grupo',
+          'The new administrator must already be a group member',
         );
       await repository.updateMemberRole(
         groupId,

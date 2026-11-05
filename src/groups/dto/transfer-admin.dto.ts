@@ -1,7 +1,11 @@
 import { IsBoolean } from 'class-validator';
-import { IsGroupId } from '../group-id';
+import { IsGroupId } from '../validators/is-group-id.validator';
 
 export class TransferAdminDto {
-  @IsGroupId() idNuevoAdministrador!: string | number;
-  @IsBoolean() salir!: boolean;
+  @IsGroupId() newAdministratorId!: string | number;
+  @IsBoolean({
+    message:
+      'leave must be a boolean: true to leave the group, or false to remain as a member (without quotes)',
+  })
+  leave!: boolean;
 }

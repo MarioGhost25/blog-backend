@@ -5,7 +5,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { GroupsController } from './groups.controller';
 import { GroupsService } from './groups.service';
 import { GroupsRepository } from './groups.repository';
-import { GroupRoleGuard } from './group-role.guard';
+import { GroupRoleGuard } from './guards/group-role.guard';
 
 @Module({
   imports: [AuthModule, CategoriesModule, PrismaModule],

@@ -36,7 +36,7 @@ export class CategoriesService implements OnModuleInit {
   async ensureCategoryExists(id: bigint): Promise<Category> {
     const category = await this.repository.findById(id);
     if (!category) {
-      throw new NotFoundException('La categoría indicada no existe');
+      throw new NotFoundException('The selected category does not exist');
     }
     return category;
   }
