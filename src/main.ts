@@ -19,13 +19,18 @@ async function bootstrap(): Promise<void> {
   app.enableShutdownHooks();
   app.use(helmet());
   app.use(cookieParser());
+  app.useGlobalPipes(createApiValidationPipe());
   app.enableCors({
     origin: process.env.FRONTEND_URL ?? 'http://localhost:3000',
     credentials: true,
   });
-  app.useGlobalPipes(createApiValidationPipe());
+
+  const port = process.env.PORT ?? 3000;
   try {
-    await app.listen(process.env.PORT ?? 3000);
+    await app.listen(port);
+    new Logger('Bootstrap').log(
+      `Listening on port ${port} (PID ${process.pid})`,
+    );
   } catch (error: unknown) {
     await app.close();
     throw error;

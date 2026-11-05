@@ -6,6 +6,7 @@ import { AuthModule } from './auth/auth.module';
 import { joiValidationSchema } from './config/joi.validation';
 import { CategoriesModule } from './categories/categories.module';
 import { GroupsModule } from './groups/groups.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { GroupsModule } from './groups/groups.module';
     AuthModule,
     CategoriesModule,
     GroupsModule,
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [AppService],

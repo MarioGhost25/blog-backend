@@ -43,7 +43,7 @@ No uses `.env` en Heroku; las variables se configuran en `Settings > Config Vars
 
 ## Contrato en inglés y permisos
 
-Las rutas, campos JSON, filtros, roles y errores públicos de auth, categorías y grupos usan inglés. Las tablas, columnas y enums de Prisma conservan sus nombres existentes: la API traduce sus resultados sin migrar los datos. El contenido escrito por usuarios no se traduce.
+Las rutas, campos JSON, filtros, roles y errores públicos de auth, users, categorías y grupos usan inglés. Las tablas, columnas y enums de Prisma conservan sus nombres existentes: la API traduce sus resultados sin migrar los datos. El contenido escrito por usuarios no se traduce.
 
 **Cambio incompatible:** actualizar las peticiones de Postman y frontend. Las rutas y campos anteriores en español ya no son válidos. La documentación explicativa sigue en español.
 
@@ -146,10 +146,20 @@ Base local: **`http://localhost:4000/api/v1`**. Las rutas de las tablas son rela
 | --- | --- | --- | --- |
 | Registrarse | POST `/auth/register` | No | 201, perfil; no inicia sesión |
 | Iniciar sesión | POST `/auth/login` | No | 200, perfil y cookie `jwt` |
-| Ver mi perfil | GET `/auth/me` | Sí | 200, perfil |
+| Consultar datos básicos de la sesión | GET `/auth/me` | Sí | 200, perfil básico |
 | Cerrar sesión | POST `/auth/logout` | No obligatoria | 204, elimina la cookie |
 | Solicitar recuperación | POST `/auth/forgot-password` | No | 202, mensaje genérico |
 | Restablecer contraseña | POST `/auth/reset-password` | No | 204, sin cuerpo |
+
+### Usuarios y perfil
+
+| Acción en la interfaz | Método y ruta | Sesión | Respuesta |
+| --- | --- | --- | --- |
+| Ver mi perfil completo | GET `/users/me` | Sí | 200, perfil privado y conteos |
+| Editar mi perfil | PATCH `/users/me` | Sí | 200, perfil privado actualizado |
+| Cambiar mi foto | PUT `/users/me/photo` | Sí | 200, perfil privado actualizado |
+| Ver mis publicaciones | GET `/users/me/posts` | Sí | 200, `items` y `nextCursor` |
+| Ver un perfil público | GET `/users/:id` | No | 200, datos públicos y conteos |
 
 ### Catálogo y exploración de grupos
 
@@ -189,57 +199,6 @@ No hay endpoints para editar o eliminar el grupo, invitar a otro usuario ni apro
 
 ## Autenticación: ejemplos y respuestas
 
-### Registro
-
-`POST /api/v1/auth/register`
-
-```json
-{
-  "firstName": "Ana",
-  "lastName": "Perez",
-  "email": "ana@example.com",
-  "password": "ExamplePassword123!"
-}
-```
-
-- `firstName` y `lastName`: entre 2 y 80 caracteres.
-- `email`: correo valido, hasta 254 caracteres. Se almacena en minusculas.
-- `password`: de 8 a 72 caracteres, con mayuscula, numero y simbolo; no puede superar 72 bytes UTF-8.
-- 409 si el correo ya esta registrado; 400 si los datos no son validos.
-- No inicia sesion automaticamente ni establece una cookie.
-
-Respuesta 201 (ejemplo):
-
-```json
-{
-  "id": 1,
-  "firstName": "Ana",
-  "lastName": "Perez",
-  "email": "ana@example.com",
-  "role": "user",
-  "status": "active",
-  "photoUrl": null
-}
-```
-
-Este mismo formato se devuelve en login y `/me`. Los nombres de propiedades estan en ingles; los valores de los enums se traducen en la API: `user` / `administrator` y `active` / `suspended`. En auth los IDs se serializan como numeros en JSON; categorías y grupos devuelven sus IDs como strings decimales para preservar la precisión de BigInt. Nunca se devuelve el hash de la contrasena.
-
-### Login
-
-`POST /api/v1/auth/login`
-
-```json
-{
-  "email": "ana@example.com",
-  "password": "ExamplePassword123!"
-}
-```
-
-Devuelve 200 con el perfil y establece la cookie `jwt` durante una hora. El JWT no se devuelve en el JSON.
-
-- 401: credenciales incorrectas.
-- 403: cuenta suspendida, despues de verificar la contrasena.
-- 400: cuerpo invalido.
 
 ### Perfil actual
 
@@ -490,30 +449,6 @@ Respuesta 201 ilustrativa:
 
 Esta respuesta es una **membresía**, no el detalle del grupo, por lo que no incluye `_count`.
 
-Ejemplo para el frontend, después de iniciar sesión:
-
-```js
-const base = 'http://localhost:4000/api/v1';
-const idGrupo = '12'; // Usar el ID real seleccionado.
-const respuesta = await fetch(base + '/groups/' + idGrupo + '/members', {
-  method: 'POST',
-  credentials: 'include',
-});
-
-// 409 en esta operación significa que ya pertenecemos al grupo.
-if (!respuesta.ok && respuesta.status !== 409) {
-  const error = await respuesta.json();
-  throw new Error([error.message].flat().join(', '));
-}
-
-const detalle = await fetch(base + '/groups/' + idGrupo, {
-  credentials: 'include',
-});
-if (!detalle.ok) throw new Error('No se pudo actualizar el grupo');
-const grupo = await detalle.json();
-// Actualizar el estado de la pantalla con estos valores:
-console.log(grupo.myRole, grupo._count.members);
-```
 
 ### Salir: DELETE /api/v1/groups/:id/members/me
 
@@ -552,73 +487,6 @@ Sin cuerpo. Requiere administrador del grupo o global. Devuelve 204 sin cuerpo. 
 
 El destinatario debe ser otro miembro del grupo. `leave` es obligatorio y debe ser booleano, no el string `"false"`. Con false, el administrador actual queda como miembro; con true, sale del grupo. Devuelve 204 sin cuerpo. Transferirse a uno mismo o a un usuario sin membresía devuelve 400. Un administrador global que no sea administrador actual de ese grupo no puede transferir: recibe 403.
 
-## Prueba completa desde PowerShell
-
-Inicia primero el backend. Ejecuta estos bloques en orden en la misma terminal PowerShell. Ajusta el puerto al de tu servidor; para Heroku, usa `https://TU-APP.herokuapp.com/api/v1`. Las sesiones guardan las cookies en memoria. También puedes usar Postman: haz login y conserva su cookie jar para el mismo host.
-
-Estos ejemplos crean dos cuentas y un grupo persistentes en la base configurada. Utiliza una base de desarrollo para esta prueba manual; no hay endpoint para borrar el grupo.
-
-```powershell
-$base = 'http://localhost:4000/api/v1'
-$suffix = [guid]::NewGuid().ToString('N')
-$emailAdmin = "admin-$suffix@example.com"
-$emailMiembro = "miembro-$suffix@example.com"
-$passwordPrueba = 'ExamplePassword123!'
-
-# Registrar dos cuentas; el registro no inicia sesión.
-foreach ($email in @($emailAdmin, $emailMiembro)) {
-  $body = @{ firstName = 'Usuario'; lastName = 'Prueba'; email = $email; password = $passwordPrueba } | ConvertTo-Json
-  Invoke-RestMethod -Method Post -Uri "$base/auth/register" -ContentType 'application/json' -Body $body
-}
-
-# Dos sesiones independientes: cada una conserva su propia cookie jwt.
-$body = @{ email = $emailAdmin; password = $passwordPrueba } | ConvertTo-Json
-Invoke-RestMethod -Method Post -Uri "$base/auth/login" -ContentType 'application/json' -Body $body -SessionVariable sesionAdmin
-$body = @{ email = $emailMiembro; password = $passwordPrueba } | ConvertTo-Json
-Invoke-RestMethod -Method Post -Uri "$base/auth/login" -ContentType 'application/json' -Body $body -SessionVariable sesionMiembro
-
-# GET categories: público. Elegir un ID real.
-$categorias = Invoke-RestMethod -Uri "$base/categories"
-$categorias | Format-Table
-$idCategoria = [string]$categorias[0].categoryId
-
-# POST grupos: el creador queda como administrador.
-$body = @{ name = 'Grupo de prueba'; categoryId = $idCategoria; description = 'Ejemplo desde PowerShell' } | ConvertTo-Json
-$grupo = Invoke-RestMethod -Method Post -Uri "$base/groups" -WebSession $sesionAdmin -ContentType 'application/json' -Body $body
-$idGrupo = [string]$grupo.groupId
-$grupo | ConvertTo-Json -Depth 6
-
-# GET listado y detalle.
-$pagina = Invoke-RestMethod -Uri "$base/groups?categoryId=$idCategoria&mine=false&limit=10" -WebSession $sesionAdmin
-$pagina | ConvertTo-Json -Depth 6
-if ($pagina.nextCursor) {
-  Invoke-RestMethod -Uri "$base/groups?categoryId=$idCategoria&mine=false&limit=10&cursor=$($pagina.nextCursor)" -WebSession $sesionAdmin
-}
-Invoke-RestMethod -Uri "$base/groups/$idGrupo" -WebSession $sesionAdmin
-
-# POST miembros: la segunda cuenta se une. Guardar su ID exacto.
-$membresia = Invoke-RestMethod -Method Post -Uri "$base/groups/$idGrupo/members" -WebSession $sesionMiembro
-$idMiembro = [string]$membresia.userId
-
-# GET miembros y PATCH rol.
-Invoke-RestMethod -Uri "$base/groups/$idGrupo/members?limit=30" -WebSession $sesionAdmin
-$body = @{ role = 'moderator' } | ConvertTo-Json
-Invoke-RestMethod -Method Patch -Uri "$base/groups/$idGrupo/members/$idMiembro" -WebSession $sesionAdmin -ContentType 'application/json' -Body $body
-
-# DELETE miembro: expulsar a la segunda cuenta (204).
-Invoke-RestMethod -Method Delete -Uri "$base/groups/$idGrupo/members/$idMiembro" -WebSession $sesionAdmin
-
-# Volver a unirse para probar la transferencia.
-Invoke-RestMethod -Method Post -Uri "$base/groups/$idGrupo/members" -WebSession $sesionMiembro
-
-# POST transferencia: la segunda cuenta pasa a administrar; la primera queda como miembro (204).
-$body = @{ newAdministratorId = $idMiembro; leave = $false } | ConvertTo-Json
-Invoke-RestMethod -Method Post -Uri "$base/groups/$idGrupo/transfer" -WebSession $sesionAdmin -ContentType 'application/json' -Body $body
-
-# DELETE me: la primera cuenta ya puede salir; queda la segunda como administrador (204).
-Invoke-RestMethod -Method Delete -Uri "$base/groups/$idGrupo/members/me" -WebSession $sesionAdmin
-Invoke-RestMethod -Uri "$base/groups/$idGrupo" -WebSession $sesionMiembro
-```
 
 Las operaciones 204 no imprimen JSON. Los errores HTTP hacen que `Invoke-RestMethod` lance una excepción; consulta el cuerpo de error en la terminal o en Postman.
 
@@ -636,18 +504,173 @@ Las operaciones 204 no imprimen JSON. Los errores HTTP hacen que `Invoke-RestMet
 | Salir, degradar o expulsar al único administrador | 409 |
 | Transferir a uno mismo o a un usuario que no pertenece al grupo | 400 |
 
-### Verificación contra la base de datos
 
-Ejecuta primero `npm run build`. El script verifica roles, transferencia, permisos y respuestas en inglés con datos temporales que se revierten al terminar. Requiere PostgreSQL.
 
-```powershell
-$env:RUN_REMOTE_SMOKE = '1'
-try {
-  node src/groups/verification/remote-smoke.cjs
-} finally {
-  Remove-Item Env:RUN_REMOTE_SMOKE -ErrorAction SilentlyContinue
+## Usuarios: perfil, foto y publicaciones
+
+Base de los ejemplos: `http://localhost:4000/api/v1`. Las rutas privadas requieren la cookie HttpOnly `jwt` obtenida al iniciar sesión. En el navegador usa `credentials: 'include'`.
+
+`GET /auth/me` sigue disponible para consultar los datos básicos de la sesión. Usa `GET /users/me` para la pantalla de perfil y los endpoints de `users` para editarlo. Las rutas antiguas `/usuarios`, `/me/foto`, `/me/publicaciones` y el campo de archivo `archivo` se reemplazan por el contrato en inglés mostrado aquí.
+
+### Mi perfil: GET /api/v1/users/me
+
+Devuelve 200 con el perfil privado del usuario autenticado. Ejemplo:
+
+```json
+{
+  "id": "3",
+  "firstName": "Jane",
+  "lastName": "Doe",
+  "email": "jane@example.com",
+  "major": "Computer Science",
+  "university": "Example University",
+  "bio": "Learning backend development.",
+  "photoUrl": null,
+  "photoPublicId": null,
+  "role": "user",
+  "status": "active",
+  "suspendedUntil": null,
+  "suspensionReason": null,
+  "suspendedBy": null,
+  "registeredAt": "2026-11-05T12:00:00.000Z",
+  "_count": { "posts": 5, "groups": 2 }
 }
 ```
+
+Los IDs se devuelven como strings y las fechas en formato ISO 8601. `role` puede ser `user` o `administrator`; `status` de la cuenta puede ser `active` o `suspended`. El perfil privado cuenta las publicaciones de todos los estados. Nunca devuelve el hash de la contraseña.
+
+### Editar mi perfil: PATCH /api/v1/users/me
+
+Enviar `Content-Type: application/json`. Todos los campos son opcionales; los omitidos conservan su valor.
+
+| Campo | Tipo | Restricción |
+| --- | --- | --- |
+| `firstName` | string | Entre 2 y 80 caracteres; no acepta `null` |
+| `lastName` | string | Entre 2 y 80 caracteres; no acepta `null` |
+| `major` | string o null | Máximo 100 caracteres |
+| `university` | string o null | Máximo 120 caracteres |
+| `bio` | string o null | Máximo 500 caracteres |
+
+```json
+{
+  "firstName": "Jane",
+  "lastName": "Doe",
+  "major": "Computer Science",
+  "university": "Example University",
+  "bio": "Learning backend development."
+}
+```
+
+Para borrar un campo opcional, enviar por ejemplo `{ "bio": null }`. El servicio elimina HTML y espacios al inicio y al final, y verifica la longitud del texto resultante. `email`, `role`, `status` y los campos de foto no se pueden modificar mediante este endpoint; enviar campos desconocidos produce 400. Responde 200 con el mismo formato de perfil privado de `GET /users/me`.
+
+### Cambiar mi foto: PUT /api/v1/users/me/photo
+
+Enviar `multipart/form-data` con un único campo de archivo llamado **`file`**. Se aceptan JPG/JPEG (`image/jpeg`) y PNG (`image/png`), con un máximo de **5 MB (5 × 1024 × 1024 bytes)**.
+
+Ejemplo en el navegador, donde `selectedFile` es un objeto `File`:
+
+```javascript
+const form = new FormData();
+form.append('file', selectedFile);
+
+const response = await fetch('http://localhost:4000/api/v1/users/me/photo', {
+  method: 'PUT',
+  credentials: 'include',
+  body: form,
+});
+const result = await response.json();
+if (!response.ok) throw new Error(result.message);
+```
+
+No establecer manualmente `Content-Type` en este ejemplo: el navegador agrega el boundary de multipart. En Postman selecciona **Body → form-data**, clave `file`, tipo **File**.
+
+Responde 200 con el perfil privado actualizado, incluyendo `photoUrl` y `photoPublicId`. Primero sube la imagen nueva, actualiza ambos campos en la base de datos y después intenta eliminar la imagen anterior. Si falla la actualización de la base de datos, intenta eliminar la imagen recién subida.
+
+Configura en el entorno del backend:
+
+```dotenv
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+```
+
+Estas credenciales se usan exclusivamente en el backend. Las nuevas fotos se guardan en la carpeta `profiles` de Cloudinary.
+
+### Mis publicaciones: GET /api/v1/users/me/posts
+
+Solo consulta publicaciones del usuario autenticado. Filtros opcionales:
+
+| Parámetro | Valores | Uso |
+| --- | --- | --- |
+| `status` | `visible`, `held`, `deleted` | Filtra por estado del contenido; sin filtro incluye todos |
+| `cursor` | ID entero positivo como string | Usa el `nextCursor` de la página anterior |
+
+Ejemplo: `GET /api/v1/users/me/posts?status=visible&cursor=42`.
+
+Devuelve hasta 20 elementos por página, ordenados por fecha de creación descendente y luego por ID descendente. No acepta un parámetro `limit`.
+
+```json
+{
+  "items": [
+    {
+      "postId": "41",
+      "authorId": "3",
+      "categoryId": "2",
+      "groupId": null,
+      "title": "Study notes",
+      "content": "Notes from today's class.",
+      "status": "visible",
+      "version": 1,
+      "createdAt": "2026-11-05T12:00:00.000Z",
+      "updatedAt": null,
+      "category": {
+        "categoryId": "2",
+        "name": "Programming",
+        "description": "Programming courses"
+      },
+      "_count": { "comments": 2, "attachments": 1 }
+    }
+  ],
+  "nextCursor": null
+}
+```
+
+`held` identifica contenido retenido y `deleted` contenido eliminado. Estos estados son distintos del `status` de una cuenta. `_count` incluye los conteos de comentarios y adjuntos, no sus listas completas. Para cargar otra página conserva el filtro `status` y envía `nextCursor` como `cursor`. Cuando `nextCursor` es `null`, no hay otra página; un listado vacío devuelve `{ "items": [], "nextCursor": null }`.
+
+### Perfil público: GET /api/v1/users/:id
+
+Ejemplo: `GET /api/v1/users/3`. No requiere sesión. El ID debe ser un entero positivo válido; sustituye `:id` por el ID real.
+
+```json
+{
+  "id": "3",
+  "firstName": "Jane",
+  "lastName": "Doe",
+  "major": "Computer Science",
+  "university": "Example University",
+  "bio": "Learning backend development.",
+  "photoUrl": null,
+  "role": "user",
+  "registeredAt": "2026-11-05T12:00:00.000Z",
+  "_count": { "posts": 3, "groups": 2 }
+}
+```
+
+El perfil público omite `email`, `photoPublicId`, `status` y los datos de suspensión. Su `_count.posts` cuenta únicamente publicaciones `visible`; `_count.groups` cuenta sus membresías en grupos.
+
+### Errores de users
+
+| HTTP | Situación |
+| --- | --- |
+| 400 | Campos, ID o cursor inválidos; archivo ausente (`You must attach an image`) |
+| 401 | Cookie JWT ausente, inválida o expirada en una ruta privada |
+| 403 | La cuenta autenticada está suspendida |
+| 404 | El perfil solicitado no existe |
+| 413 | La foto supera 5 MB; Multer la rechaza durante la recepción (`File too large`) y el servicio también comprueba el límite (`The image must not exceed 5 MB`) |
+| 415 | Tipo de imagen no permitido (`Only JPG or PNG images are allowed`) |
+| 502 | Falló la subida a Cloudinary (`Error communicating with the media storage service`) |
+
+Si el usuario de una sesión ya no existe, el guard puede responder 401 antes de llegar al servicio de perfiles. Los errores de validación del DTO usan el formato `message` y `details` descrito al inicio; los errores del servicio pueden devolver `message` como string.
 
 ## Compilar
 
