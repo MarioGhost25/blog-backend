@@ -1,4 +1,5 @@
 import {
+  IsDefined,
   IsInt,
   IsOptional,
   IsPositive,
@@ -13,5 +14,11 @@ export class UpdatePostDto {
   @IsOptional() @IsString() @Length(3, 150) title?: string;
   @IsOptional() @IsString() @MinLength(1) @MaxLength(20000) content?: string;
   @IsOptional() @IsInt() @IsPositive() categoryId?: number;
-  @IsInt() @Min(1) version!: number;
+  @IsDefined({
+    message:
+      'version is required. Get the post with GET /posts/:id and send its current version.',
+  })
+  @IsInt()
+  @Min(1)
+  version!: number;
 }

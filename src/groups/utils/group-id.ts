@@ -19,7 +19,6 @@ export function parseGroupId(value: unknown, field = 'id'): bigint {
       statusCode: 400,
       error: 'Bad Request',
       message: [message],
-      details: [{ field, code: 'invalid_value', messages: [message] }],
     });
   }
   return BigInt(value);

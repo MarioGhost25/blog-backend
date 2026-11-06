@@ -14,6 +14,7 @@ import { AttachmentStorageService } from './attachment-storage.service';
 import { CreateAttachmentDto } from './dto/create-attachment.dto';
 import { ReorderAttachmentsDto } from './dto/reorder-attachments.dto';
 import { parsePostId } from './utils/post-id';
+import type { UploadedAttachment } from './types/uploaded-attachment';
 
 @Injectable()
 export class AttachmentsService {
@@ -28,7 +29,7 @@ export class AttachmentsService {
     postId: bigint,
     user: AuthenticatedUser,
     dto: CreateAttachmentDto,
-    file?: Express.Multer.File,
+    file?: UploadedAttachment,
   ) {
     await this.posts.requireAuthor(postId, user);
     const order = await this.repository.nextOrder(postId);

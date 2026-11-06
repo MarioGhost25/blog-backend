@@ -1,12 +1,13 @@
 import { BadGatewayException, Injectable } from '@nestjs/common';
 import { v2 as cloudinary } from 'cloudinary';
 import { CloudinaryService } from '../users/cloudinary.service';
+import type { UploadedAttachment } from './types/uploaded-attachment';
 
 @Injectable()
 export class AttachmentStorageService {
   constructor(private readonly images: CloudinaryService) {}
 
-  async upload(file: Express.Multer.File, type: 'image' | 'document') {
+  async upload(file: UploadedAttachment, type: 'image' | 'document') {
     if (type === 'image') return this.images.uploadImage(file, 'posts');
     try {
       return await new Promise<{ url: string; publicId: string }>(

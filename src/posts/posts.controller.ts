@@ -28,6 +28,7 @@ import { UpdatePostDto } from './dto/update-post.dto';
 import { FilterPostsDto, SearchPostsDto } from './dto/filter-posts.dto';
 import { CreateAttachmentDto } from './dto/create-attachment.dto';
 import { ReorderAttachmentsDto } from './dto/reorder-attachments.dto';
+import type { UploadedAttachment } from './types/uploaded-attachment';
 
 @Controller('posts')
 @UseGuards(JwtAuthGuard)
@@ -102,7 +103,7 @@ export class PostsController {
     @Param('id', PostIdPipe) id: bigint,
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateAttachmentDto,
-    @UploadedFile() file?: Express.Multer.File,
+    @UploadedFile() file?: UploadedAttachment,
   ) {
     return this.attachments.addAttachment(id, user, dto, file);
   }
