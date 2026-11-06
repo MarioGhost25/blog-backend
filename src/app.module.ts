@@ -7,6 +7,7 @@ import { joiValidationSchema } from './config/joi.validation';
 import { CategoriesModule } from './categories/categories.module';
 import { GroupsModule } from './groups/groups.module';
 import { UsersModule } from './users/users.module';
+import { PostsModule } from './posts/posts.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { UsersModule } from './users/users.module';
     CategoriesModule,
     GroupsModule,
     UsersModule,
+    PostsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

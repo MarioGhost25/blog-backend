@@ -58,15 +58,19 @@ export class CategoriesRepository {
   }
 
   async seedDefaultsIfEmpty(): Promise<void> {
-    await this.prisma.$transaction(async (transaction) => {
-      if ((await transaction.categoria.count()) !== 0) return;
-
-      // PostgreSQL and the unique nombre constraint prevent duplicate seeds
-      // when multiple instances observe an empty table simultaneously.
-      await transaction.categoria.createMany({
-        data: defaultCategories,
-        skipDuplicates: true,
-      });
-    });
+    // One atomic statement avoids acquiring an interactive transaction during
+    // startup. The unique constraint also protects concurrent application starts.
+    const values = Prisma.join(
+      defaultCategories.map(
+        (category) => Prisma.sql`(${category.nombre}, ${category.descripcion})`,
+      ),
+    );
+    await this.prisma.$executeRaw`
+      INSERT INTO categoria (nombre, descripcion)
+      SELECT defaults.name, defaults.description
+      FROM (VALUES ${values}) AS defaults(name, description)
+      WHERE NOT EXISTS (SELECT 1 FROM categoria)
+      ON CONFLICT (nombre) DO NOTHING
+    `;
   }
 }
