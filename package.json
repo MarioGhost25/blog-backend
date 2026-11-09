@@ -37,6 +37,7 @@
     "dotenv": "^18.0.8",
     "helmet": "^8.3.0",
     "joi": "^18.3.1",
+    "nodemailer": "^10.4.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pg": "^8.23.1",
@@ -57,6 +58,7 @@
     "@types/jest": "^29.5.14",
     "@types/multer": "^2.3.0",
     "@types/node": "^24.19.2",
+    "@types/nodemailer": "^8.0.2",
     "@types/passport-jwt": "^4.0.1",
     "@types/pg": "^8.23.1",
     "@types/sanitize-html": "^2.16.2",
@@ -85,12 +87,25 @@
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
+      "^.+\\.ts$": [
+        "ts-jest",
+        {
+          "tsconfig": {
+            "module": "CommonJS",
+            "moduleResolution": "node",
+            "resolvePackageJsonExports": false
+          }
+        }
+      ],
+      "^.+\\.js$": "<rootDir>/../test/esm-transformer.cjs"
     },
     "collectCoverageFrom": [
       "**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "transformIgnorePatterns": [
+      "node_modules/(?!@nestjs/config/|dotenv/|dotenv-expand/)"
+    ]
   }
 }

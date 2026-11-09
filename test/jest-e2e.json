@@ -1,0 +1,23 @@
+{
+  "moduleFileExtensions": ["js", "json", "ts"],
+  "rootDir": "..",
+  "testEnvironment": "node",
+  "testRegex": "test/.*\\.e2e-spec\\.ts$",
+  "transform": {
+    "^.+\\.ts$": [
+      "ts-jest",
+      {
+        "tsconfig": {
+          "module": "CommonJS",
+          "moduleResolution": "node",
+          "resolvePackageJsonExports": false
+        }
+      }
+    ],
+    "^.+\\.js$": "<rootDir>/test/esm-transformer.cjs"
+  },
+  "transformIgnorePatterns": [
+    "node_modules/(?!@nestjs/config/|dotenv/|dotenv-expand/)"
+  ],
+  "maxWorkers": 1
+}

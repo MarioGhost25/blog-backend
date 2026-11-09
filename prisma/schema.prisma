@@ -205,7 +205,9 @@ model Categoria {
 //   * ck_publicacion_titulo: char_length(titulo) BETWEEN 3 AND 150
 //   * ck_publicacion_version: version >= 1
 // - Columna generada en BD (Tabla 10, pág. 57 | Apéndice A, pág. 166):
-//   * busqueda TSVECTOR GENERATED ALWAYS AS (to_tsvector('spanish', titulo || ' ' || contenido)) STORED
+//   * busqueda: vector STORED español ponderado, mantenido mediante SQL específico.
+//     Migración correctiva: 20261108000100_generated_search. Preservar su columna
+//     generada e índice GIN al preparar futuras migraciones Prisma.
 // - Claves foráneas: Tabla 23 (pág. 77) | Apéndice A (pág. 171)
 // - Índices: Tabla 24 (pág. 79) | Apéndice A (pág. 173)
 // - Esquema Prisma base: Apéndice B (págs. 181-182)

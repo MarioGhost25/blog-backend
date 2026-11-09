@@ -8,6 +8,7 @@ export class AttachmentStorageService {
   constructor(private readonly images: CloudinaryService) {}
 
   async upload(file: UploadedAttachment, type: 'image' | 'document') {
+    this.images.assertConfigured();
     if (type === 'image') return this.images.uploadImage(file, 'posts');
     try {
       return await new Promise<{ url: string; publicId: string }>(

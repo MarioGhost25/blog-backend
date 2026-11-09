@@ -1,0 +1,205 @@
+// Real Next -> BFF -> Nest -> PostgreSQL smoke test. No development DB is used.
+const { Client } = require('pg');
+const { randomBytes } = require('node:crypto');
+const { readFileSync, readdirSync } = require('node:fs');
+const { resolve } = require('node:path');
+const { spawn } = require('node:child_process');
+const { once } = require('node:events');
+const assert = require('node:assert/strict');
+const { hash } = require('bcrypt');
+const { createServer } = require('node:http');
+const { chromium } = require('../../blog-frontend/node_modules/playwright');
+
+const backend = resolve(__dirname, '..');
+const frontend = resolve(backend, '../blog-frontend');
+const databaseName = `web_${randomBytes(8).toString('hex')}_test`;
+const testUrl = 'postgresql://audit:local-test-only@127.0.0.1:55432/blog_test';
+const admin = new Client({ connectionString: testUrl });
+const children = [];
+let browser, created = false;
+const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=', 'base64');
+const media = createServer((_req, res) => { res.writeHead(200, { 'Content-Type': 'image/png' }); res.end(png); });
+
+async function ready(url, child) {
+  for (let i = 0; i < 120; i++) {
+    if (child.exitCode !== null) throw new Error('Test service exited before becoming ready');
+    try { if ((await fetch(url)).ok) return; } catch {}
+    await new Promise(r => setTimeout(r, 500));
+  }
+  throw new Error('Timed out waiting for test service');
+}
+function start(cwd, args, env) {
+  const child = spawn(process.execPath, args, { cwd, env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
+  // Drain output without copying environment or provider messages into reports.
+  child.stdout.on('data', () => {});
+  child.stderr.on('data', () => {});
+  children.push(child);
+  return child;
+}
+async function main() {
+  await new Promise((resolve, reject) => { media.once('error', reject); media.listen(24002, '127.0.0.1', resolve); });
+  await admin.connect();
+  await admin.query(`CREATE DATABASE ${databaseName}`);
+  created = true;
+  const url = new URL(testUrl); url.pathname = `/${databaseName}`;
+  const db = new Client({ connectionString: url.href });
+  await db.connect();
+  try {
+    for (const migration of readdirSync(resolve(backend, 'prisma/migrations')).filter(x => /^\d/.test(x)).sort()) {
+      await db.query(readFileSync(resolve(backend, 'prisma/migrations', migration, 'migration.sql'), 'utf8'));
+    }
+    await db.query("INSERT INTO usuario(nombre,apellido,correo,contrasena_hash) VALUES('Synthetic','Student','web@example.test',$1)", [await hash('Local-test-42!', 12)]);
+    await db.query("INSERT INTO categoria(nombre) VALUES('Materia de pruebas')");
+    for (let i = 1; i <= 21; i++) await db.query("INSERT INTO publicacion(id_autor,id_categoria,titulo,contenido) VALUES(1,1,$1,$2)", [`Matrices audit ${i}`, '<p>Álgebra segura</p><script>window.__auditXss=true</script>']);
+    await db.query("INSERT INTO publicacion(id_autor,id_categoria,titulo,contenido,estado) VALUES(1,1,'Contenido reservado','PRIVATE_SENTINEL','retenido')");
+    await db.query("INSERT INTO usuario(nombre,apellido,correo,contrasena_hash) VALUES('Other','Student','other@example.test',$1)", [await hash('Local-test-42!', 12)]);
+    await db.query("INSERT INTO publicacion(id_autor,id_categoria,titulo,contenido) VALUES(2,1,'Otra autoría','<p>Sin acceso de escritura</p>')");
+  } finally { await db.end(); }
+  const api = start(backend, ['--require', './test/media-storage-stub.cjs', 'dist/src/main.js'], {
+    PORT: '24001', DATABASE_URL: url.href, NODE_ENV: 'test', JWT_SECRET: randomBytes(32).toString('hex'),
+    SMTP_HOST: '127.0.0.1', SMTP_PORT: '11025', SMTP_FROM: 'test@example.test', SMTP_SECURE: 'false',
+    RECOVERY_URL: 'http://localhost:3016/recuperar', FRONTEND_URL: 'http://localhost:3016',
+    MEDIA_TEST_STUB: 'enabled', CLOUDINARY_CLOUD_NAME: 'synthetic', CLOUDINARY_API_KEY: 'synthetic', CLOUDINARY_API_SECRET: 'synthetic',
+  });
+  await ready('http://127.0.0.1:24001/api/v1', api);
+  const web = start(frontend, ['node_modules/next/dist/bin/next', 'start', '--hostname', '127.0.0.1', '--port', '3016'], {
+    BACKEND_API_URL: 'http://127.0.0.1:24001/api/v1', APP_ORIGIN: 'http://127.0.0.1:3016', NODE_ENV: 'production',
+  });
+  await ready('http://127.0.0.1:3016/buscar', web);
+  const apiResult = await fetch('http://127.0.0.1:3016/api/posts');
+  assert.equal(apiResult.status, 200);
+  const payload = await apiResult.json();
+  assert.equal(payload.elementos.length, 20);
+  assert.equal(JSON.stringify(payload).includes('PRIVATE_SENTINEL'), false);
+  assert.equal(JSON.stringify(payload).includes('cloudinaryPublicId'), false);
+  assert.equal((await fetch('http://127.0.0.1:3016/publicaciones/999999')).status, 404);
+  assert.equal((await fetch('http://127.0.0.1:3016/api/users/me/posts')).status, 401);
+  browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  const problems = [];
+  page.on('pageerror', error => problems.push(error.message));
+  await page.goto('http://127.0.0.1:3016/buscar');
+  await page.getByRole('heading', { name: 'Matrices audit 21', exact: true }).waitFor();
+  assert.equal(await page.locator('article').count(), 20);
+  await page.getByRole('button', { name: 'Cargar más publicaciones' }).click();
+  await page.getByRole('heading', { name: 'Matrices audit 1', exact: true }).waitFor();
+  assert.equal(await page.locator('article').count(), 22);
+  await page.locator('#public-query').fill('Matrices');
+  await page.locator('.search-page-form').getByRole('button', { name: 'Buscar', exact: true }).click();
+  await page.waitForURL('**/buscar?q=Matrices&categoryId=');
+  await page.getByRole('heading', { name: 'Matrices audit 21', exact: true }).click();
+  await page.locator('.article-body').waitFor();
+  assert.equal(await page.locator('.article-body script').count(), 0);
+  assert.equal(await page.evaluate(() => window.__auditXss), undefined);
+  assert.equal(await page.locator('.article-body').textContent(), 'Álgebra segura');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('http://127.0.0.1:3016/buscar');
+  await page.getByRole('heading', { name: 'Matrices audit 21', exact: true }).waitFor();
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+  const login = await page.request.post('http://127.0.0.1:3016/api/auth/login', {
+    headers: { Origin: 'http://127.0.0.1:3016' }, data: { email: 'web@example.test', password: 'Local-test-42!' },
+  });
+  assert.equal(login.status(), 200);
+  await page.goto('http://127.0.0.1:3016/perfil');
+  await page.getByLabel('Foto de perfil', { exact: true }).setInputFiles({ name: 'profile.png', mimeType: 'image/png', buffer: png });
+  const photoResponse = page.waitForResponse(r => r.url().endsWith('/api/users/me/photo') && r.request().method() === 'PUT');
+  await page.getByRole('button', { name: 'Guardar foto', exact: true }).click();
+  assert.equal((await photoResponse).status(), 200);
+  const profile = await (await page.request.get('http://127.0.0.1:3016/api/users/me')).json();
+  assert.equal(profile.photoUrl, 'http://127.0.0.1:24002/image.png');
+  assert.equal(Object.hasOwn(profile, 'photoPublicId'), false);
+  await page.goto('http://127.0.0.1:3016/mis-publicaciones?status=visible');
+  await page.getByRole('heading', { name: 'Matrices audit 21', exact: true }).waitFor();
+  assert.equal(await page.locator('article').count(), 20);
+  await page.getByRole('button', { name: 'Cargar más publicaciones propias' }).click();
+  await page.getByRole('heading', { name: 'Matrices audit 1', exact: true }).waitFor();
+  assert.equal(await page.locator('article').count(), 21);
+  assert.equal(await page.getByRole('heading', { name: 'Otra autoría', exact: true }).count(), 0);
+  await page.getByLabel('Estado', { exact: true }).selectOption('held');
+  await page.getByRole('button', { name: 'Filtrar', exact: true }).click();
+  await page.getByRole('heading', { name: 'Contenido reservado', exact: true }).waitFor();
+  assert.equal(await page.locator('article').count(), 1);
+  const badFilter = await page.request.get('http://127.0.0.1:3016/api/users/me/posts?limit=20');
+  assert.equal(badFilter.status(), 400);
+  await page.goto('http://127.0.0.1:3016/publicaciones/nueva');
+  await page.getByLabel('Título', { exact: true }).fill('Publicación creada desde navegador');
+  await page.getByLabel('Materia', { exact: true }).selectOption('1');
+  await page.getByLabel('Contenido', { exact: true }).fill('Álgebra y matrices. '.repeat(600));
+  await page.getByRole('button', { name: 'Guardar publicación' }).click();
+  await page.waitForURL(/\/publicaciones\/\d+$/);
+  const createdUrl = page.url();
+  await page.getByRole('heading', { name: 'Publicación creada desde navegador', exact: true }).waitFor();
+  await page.getByLabel('Imagen de la publicación', { exact: true }).setInputFiles({ name: 'diagram.png', mimeType: 'image/png', buffer: png });
+  await page.getByLabel('Descripción de la imagen', { exact: true }).fill('Diagrama de prueba');
+  const failedImage = page.waitForResponse(r => r.url().endsWith('/attachments') && r.request().method() === 'POST');
+  await page.getByRole('button', { name: 'Subir imagen', exact: true }).click();
+  assert.equal((await failedImage).status(), 502);
+  await page.getByRole('button', { name: 'Recargar recursos', exact: true }).waitFor();
+  assert.equal(await page.getByRole('heading', { name: 'Publicación creada desde navegador', exact: true }).count(), 1);
+  await page.getByRole('button', { name: 'Recargar recursos', exact: true }).click();
+  await page.getByLabel('Imagen de la publicación', { exact: true }).setInputFiles({ name: 'diagram.png', mimeType: 'image/png', buffer: png });
+  await page.getByLabel('Descripción de la imagen', { exact: true }).fill('Diagrama de prueba');
+  const uploadedImage = page.waitForResponse(r => r.url().endsWith('/attachments') && r.request().method() === 'POST');
+  await page.getByRole('button', { name: 'Subir imagen', exact: true }).click();
+  const uploaded = await uploadedImage;
+  assert.equal(uploaded.status(), 201);
+  assert.equal(Object.hasOwn(await uploaded.json(), 'cloudinaryPublicId'), false);
+  await page.getByRole('img', { name: 'Diagrama de prueba', exact: true }).waitFor();
+  await page.waitForFunction(() => document.querySelector('img[alt="Diagrama de prueba"]')?.naturalWidth === 1);
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: 'Eliminar imagen: Diagrama de prueba', exact: true }).click();
+  await page.getByRole('img', { name: 'Diagrama de prueba', exact: true }).waitFor({ state: 'detached' });
+  await page.getByRole('link', { name: 'Editar', exact: true }).click();
+  await page.getByLabel('Título', { exact: true }).waitFor();
+  const otherTab = await context.newPage();
+  await otherTab.goto(page.url());
+  await otherTab.getByLabel('Título', { exact: true }).waitFor();
+  await page.getByLabel('Título', { exact: true }).fill('Publicación editada');
+  await page.getByRole('button', { name: 'Guardar publicación' }).click();
+  await page.waitForURL(createdUrl);
+  await otherTab.getByLabel('Título', { exact: true }).fill('Borrador que se conserva');
+  const conflictResponse = otherTab.waitForResponse(response => response.url().includes('/api/posts/') && response.request().method() === 'PATCH');
+  await otherTab.getByRole('button', { name: 'Guardar publicación' }).click();
+  assert.equal((await conflictResponse).status(), 409);
+  await otherTab.locator('form').getByRole('alert').waitFor();
+  assert.equal(await otherTab.getByLabel('Título', { exact: true }).inputValue(), 'Borrador que se conserva');
+  await otherTab.getByRole('button', { name: 'Cargar versión actual' }).waitFor();
+  await otherTab.close();
+  const id = createdUrl.split('/').at(-1);
+  const forbidden = await page.request.delete(`http://127.0.0.1:3016/api/posts/${id}`, { headers: { Origin: 'https://attacker.example.test' } });
+  assert.equal(forbidden.status(), 403);
+  assert.equal((await page.request.get('http://127.0.0.1:3016/api/auth/me')).status(), 200);
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: 'Eliminar', exact: true }).click();
+  await page.waitForURL('**/inicio');
+  assert.equal((await page.request.get(createdUrl)).status(), 404);
+  await page.goto('http://127.0.0.1:3016/mis-publicaciones?status=deleted');
+  await page.getByRole('heading', { name: 'Publicación editada', exact: true }).waitFor();
+  assert.equal(await page.locator('article a').count(), 0);
+  assert.equal(await page.locator('article button').count(), 0);
+  const changeAccount = await page.request.post('http://127.0.0.1:3016/api/auth/login', {
+    headers: { Origin: 'http://127.0.0.1:3016' }, data: { email: 'other@example.test', password: 'Local-test-42!' },
+  });
+  assert.equal(changeAccount.status(), 200);
+  await page.goto('http://127.0.0.1:3016/mis-publicaciones');
+  await page.getByRole('heading', { name: 'Otra autoría', exact: true }).waitFor();
+  assert.equal(await page.locator('article').count(), 1);
+  assert.equal(await page.getByRole('heading', { name: 'Contenido reservado', exact: true }).count(), 0);
+  const forbiddenEdit = await page.request.patch('http://127.0.0.1:3016/api/posts/1', {
+    headers: { Origin: 'http://127.0.0.1:3016' }, data: { title: 'Cambio ajeno', version: 1 },
+  });
+  assert.equal(forbiddenEdit.status(), 403);
+  assert.equal((await page.request.get('http://127.0.0.1:3016/api/auth/me')).status(), 200);
+  assert.equal(problems.length, 0);
+  console.log('PASS browser: content CRUD, search/pagination, own posts/isolation, profile photo, publication image upload/view/delete and failed upload preserves post. Media provider is stubbed locally.');
+}
+main().catch(error => { console.error(error.message); process.exitCode = 1; }).finally(async () => {
+  if (browser) await browser.close();
+  media.close();
+  for (const child of children.reverse()) {
+    if (child.exitCode === null) { const exited = once(child, 'exit'); child.kill('SIGTERM'); await exited; }
+  }
+  if (created) await admin.query(`DROP DATABASE ${databaseName}`);
+  await admin.end();
+});

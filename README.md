@@ -1,3 +1,26 @@
+# Desarrollo local con Docker
+
+1. Copia `.env.template` a `.env` si todavía no existe.
+2. Completa `DB_USERNAME`, `DB_NAME`, `DB_PASSWORD`, `PG_PORT` (5432),
+   `JWT_SECRET` (un secreto aleatorio) y `PORT` (2000). Usa una contraseña
+   hexadecimal o alfanumérica para que funcione en la URL de conexión.
+   Para ejecutar Nest fuera de Docker, configura también `DATABASE_URL` con
+   host `localhost`; Compose configura automáticamente el host `postgres-db`.
+3. Ejecuta `docker compose up -d --build`.
+4. Verifica `curl http://localhost:2000/api/v1` y `docker compose ps`.
+
+El backend aplica las migraciones existentes antes de iniciar. PostgreSQL 18
+conserva los datos en el volumen `postgres_data`. La API y la base de datos
+se publican únicamente en localhost.
+
+- Logs: `docker compose logs -f backend`.
+- Detener conservando los datos: `docker compose down`.
+- Reconstruir después de modificar código: `docker compose up -d --build`.
+
+Configura las variables `CLOUDINARY_*` para subir imágenes o documentos.
+Sin ellas puedes iniciar la API, pero las cargas de archivos no funcionarán.
+No compartas ni subas `.env` al repositorio.
+
 # API Endpoints
 
 ## General

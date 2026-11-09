@@ -15,7 +15,9 @@ import type { JwtPayload } from './types/auth.types';
 import { AuthRepository } from './auth.repository';
 import type { UserProfile } from './auth.repository';
 import { LoginDto, RegisterDto, ResetPasswordDto } from './dto';
-
+import { MailService } from '../mail/mail.service';
+const delay = (ms: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 @Injectable()
 export class AuthService {
@@ -24,6 +26,7 @@ export class AuthService {
   constructor(
     private readonly repository: AuthRepository,
     private readonly jwt: JwtService,
+    private readonly mail: MailService,
   ) {}
 
   async register(dto: RegisterDto): Promise<UserProfile> {
@@ -88,18 +91,31 @@ export class AuthService {
   }
 
   async forgotPassword(email: string): Promise<void> {
-    const normalizedEmail = email.trim().toLowerCase();
-    const user = await this.repository.findByEmail(normalizedEmail);
-    if (!user) return;
+    const started = performance.now();
+    try {
+      const normalizedEmail = email.trim().toLowerCase();
+      const user = await this.repository.findByEmail(normalizedEmail);
+      if (!user) return;
 
-    await this.repository.invalidatePreviousTokens(user.id);
-    const rawToken = randomBytes(32).toString('base64url');
-    const tokenHash = createHash('sha256').update(rawToken).digest('hex');
-    const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
-    await this.repository.createRecoveryToken(user.id, tokenHash, expiresAt);
+      const rawToken = randomBytes(32).toString('base64url');
+      const tokenHash = createHash('sha256').update(rawToken).digest('hex');
+      const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+      await this.repository.createRecoveryToken(user.id, tokenHash, expiresAt);
 
-    if (process.env.NODE_ENV === 'development') {
-      this.logger.log(`Password reset token (development only): ${rawToken}`);
+      try {
+        await this.mail.sendRecovery(user.email, rawToken);
+      } catch {
+        // Never invalidate a newer request's token when this delivery fails.
+        await this.repository.invalidateRecoveryToken(tokenHash);
+        this.logger.warn('Password recovery delivery failed');
+      }
+    } catch {
+      // Account-specific storage failures must not disclose account existence.
+      this.logger.warn('Password recovery processing failed');
+    } finally {
+      // Same floor for missing accounts and delivery errors; all work is awaited.
+      // SMTP timeouts/retries fit this window under normal network failure modes.
+      await delay(Math.max(0, 12000 - (performance.now() - started)));
     }
   }
 
@@ -116,11 +132,12 @@ export class AuthService {
       throw new BadRequestException('Password must not exceed 72 bytes');
     }
     const passwordHash = await hash(dto.newPassword, 12);
-    const consumed = await this.repository.consumeRecoveryTokenAndUpdatePassword(
-      token.id,
-      token.userId,
-      passwordHash,
-    );
+    const consumed =
+      await this.repository.consumeRecoveryTokenAndUpdatePassword(
+        token.id,
+        token.userId,
+        passwordHash,
+      );
     if (!consumed) {
       throw new GoneException('The password reset token is invalid or expired');
     }

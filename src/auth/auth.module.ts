@@ -8,10 +8,12 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { AuthRepository } from './auth.repository';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
-
+import { MailModule } from '../mail/mail.module';
+import { AuthRateLimitGuard } from './guards/auth-rate-limit.guard';
 
 @Module({
   imports: [
+    MailModule,
     ConfigModule,
     PrismaModule,
     PassportModule.register({ defaultStrategy: 'jwt', session: false }),
@@ -25,7 +27,13 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, AuthRepository, JwtStrategy, JwtAuthGuard],
+  providers: [
+    AuthService,
+    AuthRepository,
+    JwtStrategy,
+    JwtAuthGuard,
+    AuthRateLimitGuard,
+  ],
   exports: [AuthService, JwtStrategy, JwtAuthGuard],
 })
 export class AuthModule {}
