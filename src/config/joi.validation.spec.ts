@@ -37,4 +37,24 @@ describe('recovery configuration', () => {
       }).error,
     ).toBeDefined();
   });
+  it('rejects weak production signing keys and short BFF secrets', () => {
+    const production = {
+      ...base,
+      NODE_ENV: 'production',
+      SMTP_HOST: 'smtp.example.test',
+      SMTP_FROM: 'test@example.test',
+      RECOVERY_URL: 'https://example.test/recuperar',
+    };
+    expect(joiValidationSchema.validate(production).error).toBeDefined();
+    expect(
+      joiValidationSchema.validate({
+        ...production,
+        JWT_SECRET: 'synthetic-production-key-with-32-plus-characters',
+      }).error,
+    ).toBeUndefined();
+    expect(
+      joiValidationSchema.validate({ ...base, BFF_IDENTITY_SECRET: 'short' })
+        .error,
+    ).toBeDefined();
+  });
 });

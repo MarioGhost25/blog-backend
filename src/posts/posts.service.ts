@@ -12,27 +12,87 @@ import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { FilterPostsDto, SearchPostsDto } from './dto/filter-posts.dto';
 import { parsePostId } from './utils/post-id';
+import { identifyOperation, type PostMethod } from './types/post-operation';
+import {
+  assertCanReadGroup,
+  assertCanReadPost,
+  assertPostAuthor,
+  assertCanDeletePost,
+} from './policies/post-access';
 
 @Injectable()
 export class PostsService {
   constructor(private readonly repository: PostsRepository) {}
 
+  getOperation(user: AuthenticatedUser, key: string, owner?: string) {
+    const operation = identifyOperation(
+      user.id,
+      key,
+      owner,
+      'POST',
+      undefined,
+      {},
+    );
+    return this.repository.findOperation(user.id, operation.key);
+  }
+
+  writeOperation(
+    user: AuthenticatedUser,
+    key: string,
+    owner: string | undefined,
+    method: PostMethod,
+    postId?: bigint,
+    dto?: CreatePostDto | UpdatePostDto,
+  ) {
+    const operation = identifyOperation(
+      user.id,
+      key,
+      owner,
+      method,
+      postId,
+      dto ?? {},
+    );
+    return this.repository.executeOperation(operation, async (repository) => {
+      const service = new PostsService(repository);
+      if (method === 'POST') {
+        const input = dto as CreatePostDto;
+        if (input.groupId != null)
+          throw new ForbiddenException(
+            'Operation receipts currently support public posts only',
+          );
+        return service.create(user, input);
+      }
+      const post = await service.requireAuthor(postId!, user);
+      if (post.groupId !== null)
+        throw new ForbiddenException(
+          'Operation receipts currently support public posts only',
+        );
+      if (method === 'PATCH')
+        return service.update(postId!, user, dto as UpdatePostDto);
+      await service.remove(postId!, user);
+      const deleted = await repository.findById(postId!);
+      return { id: postId!, version: deleted!.version };
+    });
+  }
+
   async create(user: AuthenticatedUser, dto: CreatePostDto) {
     const categoryId = parsePostId(dto.categoryId);
-    await this.ensureCategory(categoryId);
     const groupId = dto.groupId == null ? null : parsePostId(dto.groupId);
-    if (
-      groupId !== null &&
-      !(await this.repository.findGroupMembership(groupId, user.id))
-    ) {
-      throw new ForbiddenException('Group membership is required');
-    }
     const text = this.cleanText(dto.title, dto.content);
-    return this.repository.create({
-      authorId: user.id,
-      categoryId,
-      groupId,
-      ...text,
+    return this.repository.withGroupLock(groupId, async (repository) => {
+      await new PostsService(repository).ensureCategory(categoryId);
+      if (
+        groupId !== null &&
+        !(await repository.findGroupMembership(groupId, user.id))
+      ) {
+        throw new ForbiddenException('Group membership is required');
+      }
+      return repository.create({
+        authorId: user.id,
+        categoryId,
+        groupId,
+        ...text,
+      });
     });
   }
 
@@ -67,84 +127,84 @@ export class PostsService {
     user: AuthenticatedUser,
     query: FilterPostsDto,
   ) {
-    if (
-      !this.repository.isGlobalAdmin(user) &&
-      !(await this.repository.findGroupMembership(groupId, user.id))
-    ) {
-      throw new ForbiddenException('Group membership is required');
-    }
     const { cursor, limit, categoryId } = this.filters(query);
-    return this.page(
-      await this.repository.findGroupFeedCursor(
-        groupId,
-        cursor,
-        limit,
-        categoryId,
-      ),
-      limit,
+    return this.repository.withGroupLock(
+      groupId,
+      async (repository) => {
+        const member = await repository.findGroupMembership(groupId, user.id);
+        assertCanReadGroup(user, member?.role ?? null);
+        return this.page(
+          await repository.findGroupFeedCursor(
+            groupId,
+            cursor,
+            limit,
+            categoryId,
+          ),
+          limit,
+        );
+      },
+      'read',
     );
   }
 
   async findOne(postId: bigint, user?: AuthenticatedUser) {
-    const post = await this.requirePost(postId);
-    const admin = this.repository.isGlobalAdmin(user);
-    const membership =
-      post.groupId !== null && user
-        ? await this.repository.findGroupMembership(post.groupId, user.id)
-        : null;
-    if (post.groupId !== null && !admin && !membership)
-      throw new ForbiddenException('Group membership is required');
-    if (
-      post.status === 'retained' &&
-      post.authorId !== user?.id &&
-      !admin &&
-      membership?.role !== 'moderator' &&
-      membership?.role !== 'administrator'
-    ) {
-      throw new ForbiddenException('You cannot view this retained post');
-    }
-    return post;
+    return this.repository.withPostLock(
+      postId,
+      async (repository) => {
+        const service = new PostsService(repository);
+        const post = await service.requirePost(postId);
+        assertCanReadPost(post, user, await service.roleFor(post, user));
+        return post;
+      },
+      'read',
+    );
   }
 
   async update(postId: bigint, user: AuthenticatedUser, dto: UpdatePostDto) {
-    const post = await this.requireAuthor(postId, user);
-    const categoryId =
-      dto.categoryId == null ? undefined : parsePostId(dto.categoryId);
-    if (categoryId !== undefined) await this.ensureCategory(categoryId);
-    const text = this.cleanText(
-      dto.title ?? post.title,
-      dto.content ?? post.content,
-    );
-    const count = await this.repository.updateWithOptimisticLock(
-      postId,
-      dto.version,
-      { ...text, categoryId },
-    );
-    if (!count)
-      throw new ConflictException(
-        'Version conflict: the post was modified by another session',
+    return this.repository.withPostLock(postId, async (repository) => {
+      const service = new PostsService(repository);
+      const post = await service.requireAuthor(postId, user);
+      const categoryId =
+        dto.categoryId == null ? undefined : parsePostId(dto.categoryId);
+      if (categoryId !== undefined) await service.ensureCategory(categoryId);
+      const text = this.cleanText(
+        dto.title ?? post.title,
+        dto.content ?? post.content,
       );
-    return this.requirePost(postId);
+      const count = await repository.updateWithOptimisticLock(
+        postId,
+        dto.version,
+        { ...text, categoryId },
+      );
+      if (!count)
+        throw new ConflictException(
+          'Version conflict: the post was modified by another session',
+        );
+      return service.requirePost(postId);
+    });
   }
 
   async remove(postId: bigint, user: AuthenticatedUser) {
-    const post = await this.requirePost(postId);
-    if (post.authorId !== user.id && !this.repository.isGlobalAdmin(user)) {
-      const member =
-        post.groupId === null
-          ? null
-          : await this.repository.findGroupMembership(post.groupId, user.id);
-      if (member?.role !== 'moderator' && member?.role !== 'administrator')
-        throw new ForbiddenException('You cannot delete this post');
-    }
-    await this.repository.changeStatus(postId, 'deleted');
+    await this.repository.withPostLock(postId, async (repository) => {
+      const service = new PostsService(repository);
+      const post = await service.requirePost(postId);
+      assertCanDeletePost(post, user, await service.roleFor(post, user));
+      await repository.changeStatus(postId, 'deleted');
+    });
   }
 
   async requireAuthor(postId: bigint, user: AuthenticatedUser) {
     const post = await this.requirePost(postId);
-    if (post.authorId !== user.id)
-      throw new ForbiddenException('Only the author can modify this post');
+    assertPostAuthor(post, user, await this.roleFor(post, user));
     return post;
+  }
+
+  private async roleFor(post: PostDetail, user?: AuthenticatedUser) {
+    if (post.groupId === null || !user) return null;
+    return (
+      (await this.repository.findGroupMembership(post.groupId, user.id))
+        ?.role ?? null
+    );
   }
 
   private async requirePost(postId: bigint) {

@@ -23,7 +23,7 @@ Use two-space indentation, single quotes, and trailing commas, following Prettie
 
 ## Testing Guidelines
 
-Jest with ts-jest discovers `*.spec.ts` files inside `src`; colocate new unit tests with the code they exercise. Cover validation, permissions, and failure paths for changed behavior. No tests or coverage threshold currently exist. The `test:e2e` script references a missing `test/jest-e2e.json`; add that configuration before using it.
+Jest with ts-jest discovers `*.spec.ts` files inside `src`; colocate new unit tests with the code they exercise. Cover validation, permissions, and failure paths for changed behavior. Unit tests and `test/jest-e2e.json` exist; no coverage threshold is enforced. Integration tests use only the isolated services in `docker-compose.test.yml`, never development data. See `test/README.md` for SQL/HTTP and real Next/BFF/Nest browser checks. Use ESLint directly without `--fix` for a read-only check.
 
 ## Commit & Pull Request Guidelines
 
@@ -31,4 +31,4 @@ History mixes informal messages with `feat(scope): description`; prefer the latt
 
 ## Security & Configuration
 
-Copy `.env.template` to `.env` and supply local values. Also configure `JWT_SECRET`, which is required by `src/config/joi.validation.ts` but absent from the template. Never commit credentials or real tokens.
+Copy `.env.template` to `.env` and supply local values, including the required `JWT_SECRET` placeholder already present in the template. Never commit credentials or real tokens. Building generates Prisma Client; it does not apply migrations. Apply and test new migrations against the isolated database before considering any real deployment.

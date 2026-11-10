@@ -70,6 +70,15 @@ No compartas ni subas `.env` al repositorio.
 | DELETE | `/api/v1/groups/:id/members/:userId` | Expulsar a un integrante |
 | POST | `/api/v1/groups/:id/transfer` | Transferir la administracion del grupo |
 
+Gestión de roles, expulsión y transferencia exigen administración **local** vigente,
+revalidada bajo lock. El rol global administrador conserva moderación de contenido;
+no permite gestionar integrantes sin ese rol local. Listar integrantes exige
+membresía y solo permite buscar por nombre/apellido, sin seleccionar ni exponer correo.
+Las salidas/degradaciones/expulsiones no pueden dejar al grupo sin administrador.
+Nombres de grupo se normalizan antes de validar 3–100 caracteres; búsquedas ≤254.
+La [matriz G02 y sus pruebas](../docs/ENTREGA_G02_2026-11-09.md) documentan los criterios
+D01/D02 adoptados y sus límites. El BFF y la interfaz de grupos son el siguiente módulo.
+
 ## Posts
 
 | Metodo | Endpoint | Descripcion |
@@ -89,3 +98,17 @@ No compartas ni subas `.env` al repositorio.
 | POST | `/api/v1/posts/:id/attachments` | Agregar una imagen, PDF o enlace a la publicacion |
 | PATCH | `/api/v1/posts/:id/attachments/order` | Cambiar el orden de los adjuntos de esa publicacion |
 | DELETE | `/api/v1/posts/:id/attachments/:attachmentId` | Eliminar un adjunto de la publicacion |
+
+Escrituras grupales y adjuntos revalidan membresía dentro de la transacción en orden
+grupo → publicación → dependientes. La subida externa ocurre antes de esa transacción
+y se compensa si se perdió acceso. La eliminación externa ocurre después de confirmar
+la desvinculación en BD; un 502 puede dejar el archivo huérfano y el adjunto ya retirado.
+La limpieza durable y la entrega privada revocable siguen pendientes en A02.
+
+Tras salir/ser expulsado, el autor común pierde lectura, edición, adjuntos y eliminación
+propia grupal. Propias y su contador excluyen grupos inaccesibles; el contador público
+solo incluye publicaciones públicas visibles. Ver [contrato completo](../docs/contratos-api.md).
+
+## Seguridad HTTP y proxy
+
+Límites globales/auth/búsqueda, firma de identidad del BFF, errores con correlación y auditoría HTTP: [configuración y límites operativos](docs/SEGURIDAD_Y_PROXY.md). El store actual es de una sola instancia. Activar la fuente de IP requiere verificar el proxy real; no confiar en cabeceras enviadas directamente por el navegador. Producción exige JWT_SECRET de al menos 32 caracteres.

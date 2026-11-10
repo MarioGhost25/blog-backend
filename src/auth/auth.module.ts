@@ -10,6 +10,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { MailModule } from '../mail/mail.module';
 import { AuthRateLimitGuard } from './guards/auth-rate-limit.guard';
+import { APP_GUARD } from '@nestjs/core';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { AuthRateLimitGuard } from './guards/auth-rate-limit.guard';
     JwtStrategy,
     JwtAuthGuard,
     AuthRateLimitGuard,
+    { provide: APP_GUARD, useExisting: AuthRateLimitGuard },
   ],
   exports: [AuthService, JwtStrategy, JwtAuthGuard],
 })

@@ -1,7 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 import { Public } from '../auth/decorators/public.decorator';
 import { CategoriesService } from './categories.service';
-import type { Category } from './categories.repository';
 
 type CategoryResponse = {
   categoryId: string;

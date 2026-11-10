@@ -3,6 +3,8 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
+  Headers,
   HttpCode,
   HttpStatus,
   Param,
@@ -52,6 +54,8 @@ export class PostsController {
   }
 
   @Get('group/:groupId')
+  @Header('Cache-Control', 'private, no-store')
+  @Header('Vary', 'Cookie')
   findGroupFeed(
     @Param('groupId', PostIdPipe) groupId: bigint,
     @CurrentUser() user: AuthenticatedUser,
@@ -62,6 +66,8 @@ export class PostsController {
 
   @Public()
   @Get(':id')
+  @Header('Cache-Control', 'private, no-store')
+  @Header('Vary', 'Cookie')
   @UseGuards(OptionalPostAuthGuard)
   findOne(
     @Param('id', PostIdPipe) id: bigint,
@@ -70,8 +76,33 @@ export class PostsController {
     return this.posts.findOne(id, user);
   }
 
+  @Get('operations/:key')
+  @Header('Cache-Control', 'private, no-store')
+  @Header('Vary', 'Cookie')
+  getOperation(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('key') key: string,
+    @Headers('x-post-owner') owner?: string,
+  ) {
+    return this.posts.getOperation(user, key, owner);
+  }
+
   @Post()
-  create(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreatePostDto) {
+  create(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CreatePostDto,
+    @Headers('idempotency-key') key?: string,
+    @Headers('x-post-owner') owner?: string,
+  ) {
+    if (key !== undefined)
+      return this.posts.writeOperation(
+        user,
+        key,
+        owner,
+        'POST',
+        undefined,
+        dto,
+      );
     return this.posts.create(user, dto);
   }
 
@@ -80,7 +111,11 @@ export class PostsController {
     @Param('id', PostIdPipe) id: bigint,
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: UpdatePostDto,
+    @Headers('idempotency-key') key?: string,
+    @Headers('x-post-owner') owner?: string,
   ) {
+    if (key !== undefined)
+      return this.posts.writeOperation(user, key, owner, 'PATCH', id, dto);
     return this.posts.update(id, user, dto);
   }
 
@@ -89,7 +124,11 @@ export class PostsController {
   remove(
     @Param('id', PostIdPipe) id: bigint,
     @CurrentUser() user: AuthenticatedUser,
+    @Headers('idempotency-key') key?: string,
+    @Headers('x-post-owner') owner?: string,
   ) {
+    if (key !== undefined)
+      return this.posts.writeOperation(user, key, owner, 'DELETE', id);
     return this.posts.remove(id, user);
   }
 

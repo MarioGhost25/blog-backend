@@ -17,7 +17,6 @@ import { toUserProfileResponse } from './types/user-profile.response';
 import type { UserProfileResponse } from './types/user-profile.response';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { AuthRateLimitGuard } from './guards/auth-rate-limit.guard';
 import {
   ForgotPasswordDto,
   LoginDto,
@@ -26,7 +25,7 @@ import {
 } from './dto';
 
 @Controller('auth')
-@UseGuards(AuthRateLimitGuard, JwtAuthGuard)
+@UseGuards(JwtAuthGuard)
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 

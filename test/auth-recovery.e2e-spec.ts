@@ -2,7 +2,7 @@ import type { Server } from 'node:http';
 import { Test } from '@nestjs/testing';
 import { ConfigModule } from '@nestjs/config';
 import type { INestApplication } from '@nestjs/common';
-import { randomBytes, createHash } from 'node:crypto';
+import { randomBytes, createHash, createHmac } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { Client } from 'pg';
 import request from 'supertest';
@@ -12,6 +12,7 @@ import { PostsModule } from '../src/posts/posts.module';
 import { AuthModule } from '../src/auth/auth.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { createApiValidationPipe } from '../src/common/validation/api-validation.pipe';
+import { configureHttpSecurity } from '../src/common/security/http-security';
 
 describe('auth with real PostgreSQL and local SMTP', () => {
   jest.setTimeout(60000);
@@ -19,6 +20,7 @@ describe('auth with real PostgreSQL and local SMTP', () => {
   const email = `${name}@example.test`;
   const original = 'Original-test-42!';
   const replacement = 'Replacement-test-42!';
+  const identitySecret = randomBytes(32).toString('hex');
   let admin: Client;
   let app: INestApplication;
   let prisma: PrismaService;
@@ -52,6 +54,7 @@ describe('auth with real PostgreSQL and local SMTP', () => {
         '20261016223549_init',
         '20261108000100_generated_search',
         '20261108000200_business_checks',
+        '20261109000100_post_operations',
       ]) {
         await database.query(
           readFileSync(`prisma/migrations/${migration}/migration.sql`, 'utf8'),
@@ -69,6 +72,7 @@ describe('auth with real PostgreSQL and local SMTP', () => {
             () => ({
               DATABASE_URL: url.href,
               JWT_SECRET: randomBytes(32).toString('hex'),
+              BFF_IDENTITY_SECRET: identitySecret,
               NODE_ENV: 'test',
               SMTP_HOST: '127.0.0.1',
               SMTP_PORT: 11025,
@@ -83,6 +87,7 @@ describe('auth with real PostgreSQL and local SMTP', () => {
       ],
     }).compile();
     app = module.createNestApplication();
+    configureHttpSecurity(app);
     app.use(cookieParser());
     app.useGlobalPipes(createApiValidationPipe());
     app.setGlobalPrefix('api/v1');
@@ -92,6 +97,74 @@ describe('auth with real PostgreSQL and local SMTP', () => {
 
   // Tests retain their synthetic user but start independent rate-limit windows.
   beforeEach(() => app.get(AuthRateLimitGuard).onModuleDestroy());
+
+  function identity(ip: string, method: string, path: string) {
+    const timestamp = String(Date.now());
+    return {
+      'x-blog-client-ip': ip,
+      'x-blog-client-time': timestamp,
+      'x-blog-client-signature': createHmac('sha256', identitySecret)
+        .update(`v1\n${ip}\n${timestamp}\n${method}\n${path}`)
+        .digest('hex'),
+    };
+  }
+
+  it('isolates signed clients and does not trust forged forwarding headers', async () => {
+    const path = '/api/v1/auth/login';
+    for (let i = 0; i < 5; i++)
+      await request(app.getHttpServer() as Server)
+        .post(path)
+        .set(identity('192.0.2.1', 'POST', path))
+        .send({ email: 'missing@example.test', password: 'Wrong-test-42!' })
+        .expect(401);
+    const limited = await request(app.getHttpServer() as Server)
+      .post(path)
+      .set(identity('192.0.2.1', 'POST', path))
+      .send({ email: 'missing@example.test', password: 'Wrong-test-42!' })
+      .expect(429);
+    expect(limited.headers['retry-after']).toBeDefined();
+    expect((limited.body as { idCorrelacion: string }).idCorrelacion).toBe(
+      limited.headers['x-request-id'],
+    );
+    await request(app.getHttpServer() as Server)
+      .post(path)
+      .set(identity('192.0.2.2', 'POST', path))
+      .send({ email: 'missing@example.test', password: 'Wrong-test-42!' })
+      .expect(401);
+    for (let i = 0; i < 6; i++)
+      await request(app.getHttpServer() as Server)
+        .post(path)
+        .set({
+          'X-Forwarded-For': `192.0.2.${i + 10}`,
+          'x-blog-client-ip': `192.0.2.${i + 10}`,
+          'x-blog-client-time': String(Date.now()),
+          'x-blog-client-signature': '0'.repeat(64),
+        })
+        .send({ email: 'missing@example.test', password: 'Wrong-test-42!' })
+        .expect(i < 5 ? 401 : 429);
+  });
+
+  it('enforces global and search budgets across both public search routes', async () => {
+    for (let i = 0; i < 30; i++)
+      await request(app.getHttpServer() as Server)
+        .get(
+          i % 2
+            ? '/api/v1/posts?q=matrices'
+            : '/api/v1/posts/search?q=matrices',
+        )
+        .expect(200);
+    await request(app.getHttpServer() as Server)
+      .get('/api/v1/posts/search?q=matrices')
+      .expect(429);
+    app.get(AuthRateLimitGuard).onModuleDestroy();
+    for (let i = 0; i < 100; i++)
+      await request(app.getHttpServer() as Server)
+        .get('/api/v1/posts?limit=1')
+        .expect(200);
+    await request(app.getHttpServer() as Server)
+      .get('/api/v1/posts?limit=1')
+      .expect(429);
+  });
 
   afterAll(async () => {
     if (app) await app.close();

@@ -16,6 +16,9 @@ import { AuthRepository } from './auth.repository';
 import type { UserProfile } from './auth.repository';
 import { LoginDto, RegisterDto, ResetPasswordDto } from './dto';
 import { MailService } from '../mail/mail.service';
+// Public dummy hash: equal bcrypt work for missing accounts; never an account credential.
+const UNKNOWN_USER_HASH =
+  '$2b$12$iWrLbtIpSEoaa4shf7uLE.6eLQsN8mXOuJ/DEPBG7PZDrTebY8ddq';
 const delay = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -61,11 +64,12 @@ export class AuthService {
   async login(dto: LoginDto): Promise<{ token: string; user: UserProfile }> {
     const email = dto.email.trim().toLowerCase();
     const user = await this.repository.findByEmail(email);
-    if (
-      !user ||
-      Buffer.byteLength(dto.password, 'utf8') > 72 ||
-      !(await compare(dto.password, user.passwordHash))
-    ) {
+    const validLength = Buffer.byteLength(dto.password, 'utf8') <= 72;
+    const matches = await compare(
+      validLength ? dto.password : '',
+      user?.passwordHash ?? UNKNOWN_USER_HASH,
+    );
+    if (!user || !validLength || !matches) {
       throw new UnauthorizedException('Invalid credentials');
     }
     if (user.status === EstadoUsuario.suspendido) {

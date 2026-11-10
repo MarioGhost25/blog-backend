@@ -7,7 +7,7 @@ const { spawn } = require('node:child_process');
 const { once } = require('node:events');
 const assert = require('node:assert/strict');
 const { hash } = require('bcrypt');
-const { createServer } = require('node:http');
+const { createServer, request: httpRequest } = require('node:http');
 const { chromium } = require('../../blog-frontend/node_modules/playwright');
 
 const backend = resolve(__dirname, '..');
@@ -19,6 +19,19 @@ const children = [];
 let browser, created = false;
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=', 'base64');
 const media = createServer((_req, res) => { res.writeHead(200, { 'Content-Type': 'image/png' }); res.end(png); });
+const identitySecret = randomBytes(32).toString('hex');
+let clientIp = '192.0.2.10';
+// Isolated trusted edge fixture. The browser cannot choose its forwarded identity.
+const edge = createServer((req, res) => {
+  const headers = { ...req.headers, 'x-real-ip': clientIp };
+  delete headers['x-forwarded-for'];
+  for (const key of Object.keys(headers)) if (key.startsWith('x-blog-')) delete headers[key];
+  const upstream = httpRequest({ hostname: '127.0.0.1', port: 3017, path: req.url, method: req.method, headers }, result => {
+    res.writeHead(result.statusCode, result.headers); result.pipe(res);
+  });
+  upstream.on('error', () => { res.writeHead(503); res.end(); });
+  req.pipe(upstream);
+});
 
 async function ready(url, child) {
   for (let i = 0; i < 120; i++) {
@@ -37,7 +50,14 @@ function start(cwd, args, env) {
   return child;
 }
 async function main() {
+  // Do not accidentally test a stale/unrelated server after a failed run.
+  for (const port of [24001, 3017]) {
+    const probe = createServer();
+    await new Promise((resolve, reject) => { probe.once('error', reject); probe.listen(port, '127.0.0.1', resolve); });
+    await new Promise((resolve, reject) => probe.close(error => error ? reject(error) : resolve()));
+  }
   await new Promise((resolve, reject) => { media.once('error', reject); media.listen(24002, '127.0.0.1', resolve); });
+  await new Promise((resolve, reject) => { edge.once('error', reject); edge.listen(3016, '127.0.0.1', resolve); });
   await admin.connect();
   await admin.query(`CREATE DATABASE ${databaseName}`);
   created = true;
@@ -60,10 +80,12 @@ async function main() {
     SMTP_HOST: '127.0.0.1', SMTP_PORT: '11025', SMTP_FROM: 'test@example.test', SMTP_SECURE: 'false',
     RECOVERY_URL: 'http://localhost:3016/recuperar', FRONTEND_URL: 'http://localhost:3016',
     MEDIA_TEST_STUB: 'enabled', CLOUDINARY_CLOUD_NAME: 'synthetic', CLOUDINARY_API_KEY: 'synthetic', CLOUDINARY_API_SECRET: 'synthetic',
+    BFF_IDENTITY_SECRET: identitySecret,
   });
   await ready('http://127.0.0.1:24001/api/v1', api);
-  const web = start(frontend, ['node_modules/next/dist/bin/next', 'start', '--hostname', '127.0.0.1', '--port', '3016'], {
+  const web = start(frontend, ['node_modules/next/dist/bin/next', 'start', '--hostname', '127.0.0.1', '--port', '3017'], {
     BACKEND_API_URL: 'http://127.0.0.1:24001/api/v1', APP_ORIGIN: 'http://127.0.0.1:3016', NODE_ENV: 'production',
+    BFF_IDENTITY_SECRET: identitySecret, BFF_CLIENT_IP_SOURCE: 'trusted-proxy',
   });
   await ready('http://127.0.0.1:3016/buscar', web);
   const apiResult = await fetch('http://127.0.0.1:3016/api/posts');
@@ -97,10 +119,31 @@ async function main() {
   await page.goto('http://127.0.0.1:3016/buscar');
   await page.getByRole('heading', { name: 'Matrices audit 21', exact: true }).waitFor();
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+  clientIp = '192.0.2.11';
   const login = await page.request.post('http://127.0.0.1:3016/api/auth/login', {
     headers: { Origin: 'http://127.0.0.1:3016' }, data: { email: 'web@example.test', password: 'Local-test-42!' },
   });
   assert.equal(login.status(), 200);
+  await page.goto('http://127.0.0.1:3016/grupos');
+  await page.getByLabel('Nombre', { exact: true }).fill('Grupo de integración G01');
+  await page.locator('select[name=categoryId]').last().selectOption('1');
+  await page.getByRole('button', { name: 'Crear grupo', exact: true }).click();
+  await page.waitForURL(/\/grupos\/\d+$/);
+  const groupUrl = page.url();
+  await page.getByText('Tu rol: Administrador', { exact: true }).waitFor();
+  page.once('dialog', d => d.accept());
+  await page.getByRole('button', { name: 'Salir del grupo' }).click();
+  await page.getByRole('alert').filter({ hasText: 'último administrador' }).waitFor();
+  const otherContext = await browser.newContext();
+  const otherPage = await otherContext.newPage();
+  assert.equal((await otherPage.request.post('http://127.0.0.1:3016/api/auth/login', { headers: { Origin: 'http://127.0.0.1:3016' }, data: { email: 'other@example.test', password: 'Local-test-42!' } })).status(), 200);
+  await otherPage.goto(groupUrl);
+  await otherPage.getByRole('button', { name: 'Unirme al grupo' }).click();
+  await otherPage.getByText('Tu rol: Miembro', { exact: true }).waitFor();
+  otherPage.once('dialog', d => d.accept());
+  await otherPage.getByRole('button', { name: 'Salir del grupo' }).click();
+  await otherPage.getByRole('button', { name: 'Unirme al grupo' }).waitFor();
+  await otherContext.close();
   await page.goto('http://127.0.0.1:3016/perfil');
   await page.getByLabel('Foto de perfil', { exact: true }).setInputFiles({ name: 'profile.png', mimeType: 'image/png', buffer: png });
   const photoResponse = page.waitForResponse(r => r.url().endsWith('/api/users/me/photo') && r.request().method() === 'PUT');
@@ -178,6 +221,9 @@ async function main() {
   await page.getByRole('heading', { name: 'Publicación editada', exact: true }).waitFor();
   assert.equal(await page.locator('article a').count(), 0);
   assert.equal(await page.locator('article button').count(), 0);
+  clientIp = '192.0.2.20';
+  await require('./publication-recovery-smoke.cjs')({ page, context, databaseUrl: url.href });
+  clientIp = '192.0.2.12';
   const changeAccount = await page.request.post('http://127.0.0.1:3016/api/auth/login', {
     headers: { Origin: 'http://127.0.0.1:3016' }, data: { email: 'other@example.test', password: 'Local-test-42!' },
   });
@@ -191,12 +237,27 @@ async function main() {
   });
   assert.equal(forbiddenEdit.status(), 403);
   assert.equal((await page.request.get('http://127.0.0.1:3016/api/auth/me')).status(), 200);
+  for (let i = 0; i < 31; i++) {
+    const result = await page.request.get('http://127.0.0.1:3016/api/posts?q=matrices', {
+      headers: { 'X-Forwarded-For': `203.0.113.${i}`, 'x-blog-client-ip': `203.0.113.${i}` },
+    });
+    assert.equal(result.status(), i < 30 ? 200 : 429);
+    if (i === 30) {
+      const body = await result.json();
+      assert.equal(body.error, 'RateLimited');
+      assert.equal(body.idCorrelacion, result.headers()['x-request-id']);
+      assert.equal(String(body.retryAfter), result.headers()['retry-after']);
+    }
+  }
+  clientIp = '192.0.2.13';
+  assert.equal((await page.request.get('http://127.0.0.1:3016/api/posts?q=matrices')).status(), 200);
   assert.equal(problems.length, 0);
-  console.log('PASS browser: content CRUD, search/pagination, own posts/isolation, profile photo, publication image upload/view/delete and failed upload preserves post. Media provider is stubbed locally.');
+  console.log('PASS browser: content/auth/media and publication recovery; draft navigation, lost POST/PATCH/DELETE replies, session recovery/account isolation; trusted edge -> BFF signature -> Nest; spoofed headers ignored, per-client search budgets, Retry-After and correlation. Media provider stubbed locally.');
 }
 main().catch(error => { console.error(error.message); process.exitCode = 1; }).finally(async () => {
   if (browser) await browser.close();
   media.close();
+  edge.close();
   for (const child of children.reverse()) {
     if (child.exitCode === null) { const exited = once(child, 'exit'); child.kill('SIGTERM'); await exited; }
   }

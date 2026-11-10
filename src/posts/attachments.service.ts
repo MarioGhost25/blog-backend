@@ -31,8 +31,9 @@ export class AttachmentsService {
     dto: CreateAttachmentDto,
     file?: UploadedAttachment,
   ) {
+    // Cheap preflight before contacting a provider. The same policy is checked
+    // again under group -> post locks before linking the uploaded asset.
     await this.posts.requireAuthor(postId, user);
-    const order = await this.repository.nextOrder(postId);
     if (dto.type === 'link') {
       if (
         !dto.url ||
@@ -44,14 +45,16 @@ export class AttachmentsService {
       ) {
         throw new BadRequestException('A valid HTTP or HTTPS URL is required');
       }
-      return this.repository.create({
-        postId,
-        type: dto.type,
-        title: dto.title,
-        url: dto.url,
-        cloudinaryPublicId: null,
-        order,
-      });
+      const url = dto.url;
+      return this.withAuthor(postId, user, (repository) =>
+        repository.create({
+          postId,
+          type: dto.type,
+          title: dto.title,
+          url,
+          cloudinaryPublicId: null,
+        }),
+      );
     }
     if (!file) throw new BadRequestException('A file is required');
     if (file.size > 10 * 1024 * 1024 || file.buffer.length > 10 * 1024 * 1024)
@@ -64,14 +67,15 @@ export class AttachmentsService {
       );
     const asset = await this.storage.upload(file, dto.type);
     try {
-      return await this.repository.create({
-        postId,
-        type: dto.type,
-        title: dto.title,
-        url: asset.url,
-        cloudinaryPublicId: asset.publicId,
-        order,
-      });
+      return await this.withAuthor(postId, user, (repository) =>
+        repository.create({
+          postId,
+          type: dto.type,
+          title: dto.title,
+          url: asset.url,
+          cloudinaryPublicId: asset.publicId,
+        }),
+      );
     } catch (error) {
       try {
         await this.storage.delete(asset.publicId, dto.type);
@@ -89,27 +93,39 @@ export class AttachmentsService {
     user: AuthenticatedUser,
     dto: ReorderAttachmentsDto,
   ) {
-    await this.posts.requireAuthor(postId, user);
     const ids = dto.attachmentIds.map(parsePostId);
-    const attachments = await this.repository.findByPostId(postId);
-    if (
-      !ids.length ||
-      ids.length !== attachments.length ||
-      new Set(ids).size !== ids.length ||
-      attachments.some((attachment) => !ids.includes(attachment.id))
-    ) {
-      throw new BadRequestException('Provide every attachment ID exactly once');
-    }
-    return this.repository.reorder(postId, ids);
+    return this.withAuthor(postId, user, (repository) =>
+      repository.reorder(postId, ids),
+    );
   }
 
   async remove(postId: bigint, attachmentId: bigint, user: AuthenticatedUser) {
-    await this.posts.requireAuthor(postId, user);
-    const attachment = await this.repository.findById(attachmentId);
-    if (!attachment || attachment.postId !== postId)
-      throw new NotFoundException('Attachment not found');
+    const attachment = await this.withAuthor(
+      postId,
+      user,
+      async (repository) => {
+        const current = await repository.findById(attachmentId);
+        if (!current || current.postId !== postId)
+          throw new NotFoundException('Attachment not found');
+        return repository.delete(attachmentId);
+      },
+    );
+    // The authorized DB deletion is the commit point. Never delete the provider
+    // asset before current membership has been checked and the unlink committed.
+    // Provider failures still surface as 502; reloading shows the committed DB
+    // state. Durable provider cleanup remains part of A02.
     if (attachment.cloudinaryPublicId)
       await this.storage.delete(attachment.cloudinaryPublicId, attachment.type);
-    await this.repository.delete(attachmentId);
+  }
+
+  private withAuthor<T>(
+    postId: bigint,
+    user: AuthenticatedUser,
+    work: (repository: AttachmentsRepository) => Promise<T>,
+  ) {
+    return this.repository.withPostLock(postId, async (repository, posts) => {
+      await new PostsService(posts).requireAuthor(postId, user);
+      return work(repository);
+    });
   }
 }

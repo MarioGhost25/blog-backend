@@ -1,7 +1,10 @@
 import { IsOptional, IsString, Length, MaxLength } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { normalizeName } from '../../common/validation/normalize-name';
 import { IsGroupId } from '../validators/is-group-id.validator';
 
 export class CreateGroupDto {
+  @Transform(({ value }: { value: unknown }) => normalizeName(value))
   @IsString()
   @Length(3, 100)
   name!: string;

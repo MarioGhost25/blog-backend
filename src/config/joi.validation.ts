@@ -3,6 +3,7 @@ import * as Joi from 'joi';
 export const joiValidationSchema = Joi.object({
   PORT: Joi.number().default(2000),
   JWT_SECRET: Joi.string().required(),
+  BFF_IDENTITY_SECRET: Joi.string().min(32),
   DATABASE_URL: Joi.string().required(),
   NODE_ENV: Joi.string()
     .valid('development', 'test', 'production')
@@ -21,6 +22,7 @@ export const joiValidationSchema = Joi.object({
     Joi.object({ NODE_ENV: Joi.valid('production').required() }).unknown(),
     {
       then: Joi.object({
+        JWT_SECRET: Joi.string().min(32).required(),
         SMTP_HOST: Joi.required(),
         SMTP_FROM: Joi.required(),
         RECOVERY_URL: Joi.string()

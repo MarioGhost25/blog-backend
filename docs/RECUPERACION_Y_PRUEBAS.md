@@ -53,13 +53,12 @@ Registro/login/reset: 5 por minuto y dirección IP; recuperación: 3 por hora e 
 Responde 429 con Retry-After. No confía en X-Forwarded-For enviado arbitrariamente.
 El almacenamiento actual es por proceso y se reinicia al reiniciar Nest.
 
-**Pendiente S01:** configurar el proxy confiable/BFF para identificar clientes
-sin aceptar IP falsificada, y almacenamiento compartido antes de varias réplicas.
-Sin esa configuración, los usuarios detrás del BFF pueden compartir el límite
-de la IP de Next. No marcar S01 completo ni desplegar a múltiples instancias con
-esta implementación. También faltan límites globales/búsqueda/reportes y auditoría
-transversal. Las pruebas HTTP verifican el guard real; cada caso comienza una
-ventana independiente de límites.
+S01 añade límite global 100/min, búsqueda 30/min, firma BFF y auditoría HTTP.
+La activación del proxy real y el almacenamiento compartido siguen pendientes;
+sin firma configurada, clientes detrás de Next pueden compartir contador. Los
+contadores actuales solo garantizan una instancia. Consultar
+[SEGURIDAD_Y_PROXY.md](SEGURIDAD_Y_PROXY.md) antes de desplegar estos cambios.
+Las pruebas HTTP usan el guard real; cada caso comienza una ventana independiente.
 
 ## Ejecutar la integración
 

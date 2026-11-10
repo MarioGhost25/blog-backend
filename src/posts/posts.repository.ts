@@ -1,9 +1,14 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import type { AuthenticatedUser } from '../auth/types/auth.types';
-import { mapAttachment } from './attachments.repository';
+import { mapAttachment } from './mappers/attachment';
 import type { PostStatus, PostWrite } from './types/posts.types';
+import type { OperationInput } from './types/post-operation';
+import {
+  lockGroup,
+  lockPostHierarchy,
+  type ContentLock,
+} from '../common/database/content-locks';
 
 const databaseStatuses = {
   visible: 'visible',
@@ -63,13 +68,126 @@ export type PostDetail = ReturnType<typeof mapPost>;
 export class PostsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  isGlobalAdmin(user?: AuthenticatedUser) {
-    return user?.role === 'administrador';
+  private transaction?: Prisma.TransactionClient;
+  private get db() {
+    return this.transaction ?? this.prisma;
+  }
+
+  inTransaction(tx: Prisma.TransactionClient) {
+    const scoped = new PostsRepository(this.prisma);
+    scoped.transaction = tx;
+    return scoped;
+  }
+
+  private withTransaction<T>(
+    work: (
+      repository: PostsRepository,
+      tx: Prisma.TransactionClient,
+    ) => Promise<T>,
+  ) {
+    if (this.transaction) return work(this, this.transaction);
+    return this.prisma.$transaction((tx) => work(this.inTransaction(tx), tx), {
+      isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+      maxWait: 5000,
+      timeout: 10000,
+    });
+  }
+
+  withGroupLock<T>(
+    groupId: bigint | null,
+    work: (repository: PostsRepository) => Promise<T>,
+    mode: ContentLock = 'write',
+  ) {
+    return this.withTransaction(async (repository, tx) => {
+      if (groupId !== null) await lockGroup(tx, groupId, mode);
+      return work(repository);
+    });
+  }
+
+  withPostLock<T>(
+    postId: bigint,
+    work: (repository: PostsRepository) => Promise<T>,
+    mode: ContentLock = 'write',
+  ) {
+    return this.withTransaction(async (repository, tx) => {
+      await lockPostHierarchy(tx, postId, mode);
+      return work(repository);
+    });
+  }
+
+  async findOperation(userId: bigint, key: string) {
+    const row = await this.db.operacionPublicacion.findUnique({
+      where: { id_usuario_clave: { id_usuario: userId, clave: key } },
+      select: {
+        clave: true,
+        metodo: true,
+        id_publicacion: true,
+        version: true,
+      },
+    });
+    return row
+      ? {
+          status: 'confirmed' as const,
+          key: row.clave,
+          method: row.metodo,
+          postId: row.id_publicacion.toString(),
+          version: row.version,
+        }
+      : { status: 'unknown' as const };
+  }
+
+  async executeOperation(
+    operation: OperationInput,
+    write: (
+      repository: PostsRepository,
+    ) => Promise<{ id: bigint; version: number }>,
+  ) {
+    return this.prisma.$transaction(
+      async (tx) => {
+        // Serializes the same actor/key even before a receipt exists. Hash collisions
+        // only serialize unrelated work; the exact composite key still selects data.
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`${operation.userId}:${operation.key}`}, 0))::text`;
+        const previous = await tx.operacionPublicacion.findUnique({
+          where: {
+            id_usuario_clave: {
+              id_usuario: operation.userId,
+              clave: operation.key,
+            },
+          },
+        });
+        if (
+          previous &&
+          (previous.huella !== operation.fingerprint ||
+            previous.metodo !== operation.method)
+        ) {
+          throw new ConflictException({
+            error: 'OperationKeyConflict',
+            message: 'This operation key was used with a different request',
+          });
+        }
+        const repository = this.inTransaction(tx);
+        if (!previous) {
+          const result = await write(repository);
+          await tx.operacionPublicacion.create({
+            data: {
+              id_usuario: operation.userId,
+              clave: operation.key,
+              metodo: operation.method,
+              huella: operation.fingerprint,
+              id_publicacion: result.id,
+              version: result.version,
+            },
+          });
+        }
+        return repository.findOperation(operation.userId, operation.key);
+      },
+      { maxWait: 5000, timeout: 10000 },
+    );
   }
 
   async create(data: PostWrite) {
     return mapPost(
-      await this.prisma.publicacion.create({
+      await this.db.publicacion.create({
         data: {
           id_autor: data.authorId,
           id_categoria: data.categoryId,
@@ -84,7 +202,7 @@ export class PostsRepository {
   }
 
   async findById(postId: bigint) {
-    const row = await this.prisma.publicacion.findUnique({
+    const row = await this.db.publicacion.findUnique({
       where: { id_publicacion: postId },
       include,
     });
@@ -121,7 +239,7 @@ export class PostsRepository {
     cursor: bigint | undefined,
     limit: number,
   ) {
-    const rows = await this.prisma.publicacion.findMany({
+    const rows = await this.db.publicacion.findMany({
       where,
       include,
       orderBy: [{ fecha_creacion: 'desc' }, { id_publicacion: 'desc' }],
@@ -137,7 +255,7 @@ export class PostsRepository {
     cursor?: bigint,
     limit = 20,
   ) {
-    const ids = await this.prisma.$queryRaw<{ id: bigint }[]>(Prisma.sql`
+    const ids = await this.db.$queryRaw<{ id: bigint }[]>(Prisma.sql`
       SELECT p.id_publicacion AS id FROM publicacion p
       WHERE p.busqueda @@ plainto_tsquery('spanish', ${q})
         AND p.id_grupo IS NULL AND p.estado = 'visible'
@@ -150,7 +268,7 @@ export class PostsRepository {
         }
       ORDER BY p.fecha_creacion DESC, p.id_publicacion DESC LIMIT ${limit + 1}`);
     if (!ids.length) return [];
-    const rows = await this.prisma.publicacion.findMany({
+    const rows = await this.db.publicacion.findMany({
       where: {
         id_publicacion: { in: ids.map(({ id }) => id) },
         id_grupo: null,
@@ -172,7 +290,7 @@ export class PostsRepository {
       status: Exclude<PostStatus, 'deleted'>;
     },
   ) {
-    const result = await this.prisma.publicacion.updateMany({
+    const result = await this.db.publicacion.updateMany({
       where: {
         id_publicacion: postId,
         version: currentVersion,
@@ -191,7 +309,7 @@ export class PostsRepository {
   }
 
   async changeStatus(postId: bigint, status: PostStatus) {
-    await this.prisma.publicacion.updateMany({
+    await this.db.publicacion.updateMany({
       where: { id_publicacion: postId, estado: { not: 'eliminado' } },
       data: {
         estado: databaseStatuses[status],
@@ -203,14 +321,14 @@ export class PostsRepository {
 
   async categoryExists(categoryId: bigint) {
     return (
-      (await this.prisma.categoria.count({
+      (await this.db.categoria.count({
         where: { id_categoria: categoryId },
       })) > 0
     );
   }
 
   async findGroupMembership(groupId: bigint, userId: bigint) {
-    const row = await this.prisma.miembroGrupo.findUnique({
+    const row = await this.db.miembroGrupo.findUnique({
       where: { id_grupo_id_usuario: { id_grupo: groupId, id_usuario: userId } },
     });
     const roles = {
