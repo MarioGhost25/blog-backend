@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import sanitizeHtml from 'sanitize-html';
+import { containsProhibitedWords } from '../common/validation/content-text';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { PostsRepository, type PostDetail } from './posts.repository';
 import { CreatePostDto } from './dto/create-post.dto';
@@ -56,17 +57,9 @@ export class PostsService {
       const service = new PostsService(repository);
       if (method === 'POST') {
         const input = dto as CreatePostDto;
-        if (input.groupId != null)
-          throw new ForbiddenException(
-            'Operation receipts currently support public posts only',
-          );
         return service.create(user, input);
       }
-      const post = await service.requireAuthor(postId!, user);
-      if (post.groupId !== null)
-        throw new ForbiddenException(
-          'Operation receipts currently support public posts only',
-        );
+      await service.requireAuthor(postId!, user);
       if (method === 'PATCH')
         return service.update(postId!, user, dto as UpdatePostDto);
       await service.remove(postId!, user);
@@ -101,6 +94,16 @@ export class PostsService {
     const filters = this.filters(query);
     return this.page(
       await this.repository.findPublicFeedCursor(filters),
+      filters.limit,
+    );
+  }
+
+  async findPersonalFeed(user: AuthenticatedUser, query: FilterPostsDto) {
+    if (query.q !== undefined)
+      throw new BadRequestException('Search uses the public search endpoint');
+    const filters = this.filters(query);
+    return this.page(
+      await this.repository.findPersonalFeedCursor(user.id, filters),
       filters.limit,
     );
   }
@@ -153,8 +156,20 @@ export class PostsService {
       async (repository) => {
         const service = new PostsService(repository);
         const post = await service.requirePost(postId);
-        assertCanReadPost(post, user, await service.roleFor(post, user));
-        return post;
+        const role = await service.roleFor(post, user);
+        assertCanReadPost(post, user, role);
+        return {
+          ...post,
+          permissions: {
+            edit:
+              post.authorId === user?.id &&
+              (post.groupId === null || role !== null),
+            moderate:
+              user?.role === 'administrador' ||
+              role === 'moderator' ||
+              role === 'administrator',
+          },
+        };
       },
       'read',
     );
@@ -184,12 +199,21 @@ export class PostsService {
     });
   }
 
-  async remove(postId: bigint, user: AuthenticatedUser) {
+  async remove(postId: bigint, user: AuthenticatedUser, observation?: string) {
     await this.repository.withPostLock(postId, async (repository) => {
       const service = new PostsService(repository);
       const post = await service.requirePost(postId);
       assertCanDeletePost(post, user, await service.roleFor(post, user));
+      if (post.authorId !== user.id && !observation)
+        throw new BadRequestException('An observation is required');
       await repository.changeStatus(postId, 'deleted');
+      if (post.authorId !== user.id)
+        await repository.recordRemoval(
+          postId,
+          user.id,
+          post.authorId,
+          observation!,
+        );
     });
   }
 
@@ -275,16 +299,7 @@ export class PostsService {
         'Title and content must remain valid after sanitization',
       );
     }
-    const plainText = sanitizeHtml(title + ' ' + content, {
-      allowedTags: [],
-      allowedAttributes: {},
-    })
-      .normalize('NFKD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase();
-    const prohibitedWords = ['idiota', 'imbecil', 'mierda', 'fuck', 'shit'];
-    const words = plainText.match(/[\p{L}\p{N}]+/gu) ?? [];
-    const status = words.some((word) => prohibitedWords.includes(word))
+    const status = containsProhibitedWords(title + ' ' + content)
       ? ('retained' as const)
       : ('visible' as const);
     return { title, content, status };

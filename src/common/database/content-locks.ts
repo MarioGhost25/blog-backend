@@ -21,6 +21,7 @@ export async function lockPostHierarchy(
   tx: Prisma.TransactionClient,
   postId: bigint,
   mode: ContentLock = 'write',
+  allowDeleted = false,
 ) {
   // The API never changes a post's group. Check again under the lock so a future
   // move implementation cannot silently violate the lock order.
@@ -35,7 +36,7 @@ export async function lockPostHierarchy(
   >(Prisma.sql`
     SELECT id_grupo, estado FROM publicacion WHERE id_publicacion = ${postId}
     ${mode === 'read' ? Prisma.sql`FOR SHARE` : Prisma.sql`FOR UPDATE`}`);
-  if (!rows.length || rows[0].estado === 'eliminado')
+  if (!rows.length || (!allowDeleted && rows[0].estado === 'eliminado'))
     throw new NotFoundException('Post not found');
   if (rows[0].id_grupo !== initial.id_grupo)
     throw new ConflictException(

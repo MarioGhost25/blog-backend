@@ -1,7 +1,7 @@
 import {
   BadRequestException,
   Injectable,
-  Logger,
+  GoneException,
   NotFoundException,
   PayloadTooLargeException,
   UnsupportedMediaTypeException,
@@ -15,14 +15,16 @@ import { CreateAttachmentDto } from './dto/create-attachment.dto';
 import { ReorderAttachmentsDto } from './dto/reorder-attachments.dto';
 import { parsePostId } from './utils/post-id';
 import type { UploadedAttachment } from './types/uploaded-attachment';
+import { validateMediaFile } from '../common/validation/media-file';
+import { MediaCleanupService } from './media-cleanup.service';
 
 @Injectable()
 export class AttachmentsService {
-  private readonly logger = new Logger(AttachmentsService.name);
   constructor(
     private readonly posts: PostsService,
     private readonly repository: AttachmentsRepository,
     private readonly storage: AttachmentStorageService,
+    private readonly cleanup: MediaCleanupService,
   ) {}
 
   async addAttachment(
@@ -65,27 +67,22 @@ export class AttachmentsService {
       throw new UnsupportedMediaTypeException(
         'The file type does not match the attachment type',
       );
-    const asset = await this.storage.upload(file, dto.type);
-    try {
-      return await this.withAuthor(postId, user, (repository) =>
-        repository.create({
-          postId,
-          type: dto.type,
-          title: dto.title,
-          url: asset.url,
-          cloudinaryPublicId: asset.publicId,
-        }),
-      );
-    } catch (error) {
-      try {
-        await this.storage.delete(asset.publicId, dto.type);
-      } catch {
-        this.logger.error(
-          'Could not clean up an attachment after a database failure',
-        );
-      }
-      throw error;
-    }
+    await validateMediaFile(file, dto.type);
+    const publicId = await this.cleanup.begin(dto.type);
+    await this.storage.upload(file, dto.type, publicId);
+    // A pending intent is recoverable even if upload or the commit response is lost.
+    return this.withAuthor(postId, user, async (repository) => {
+      await repository.linkUpload(publicId);
+      return repository.create({
+        postId,
+        type: dto.type,
+        title: dto.title,
+        url: '',
+        cloudinaryPublicId: publicId,
+        delivery: 'authenticated',
+        mime: file.mimetype,
+      });
+    });
   }
 
   async reorder(
@@ -110,12 +107,39 @@ export class AttachmentsService {
         return repository.delete(attachmentId);
       },
     );
-    // The authorized DB deletion is the commit point. Never delete the provider
-    // asset before current membership has been checked and the unlink committed.
-    // Provider failures still surface as 502; reloading shows the committed DB
-    // state. Durable provider cleanup remains part of A02.
     if (attachment.cloudinaryPublicId)
-      await this.storage.delete(attachment.cloudinaryPublicId, attachment.type);
+      await this.cleanup.cleanup(attachment.cloudinaryPublicId);
+  }
+
+  async content(
+    postId: bigint,
+    attachmentId: bigint,
+    user?: AuthenticatedUser,
+  ) {
+    const post = await this.posts.findOne(postId, user);
+    const attachment = post.attachments.find(
+      (item) => item.id === attachmentId,
+    );
+    if (!attachment || attachment.type === 'link')
+      throw new NotFoundException();
+    if (
+      attachment.delivery !== 'authenticated' ||
+      !attachment.cloudinaryPublicId ||
+      !attachment.mime
+    )
+      throw new GoneException(
+        'This legacy resource requires a private storage migration',
+      );
+    const buffer = await this.storage.read(
+      attachment.cloudinaryPublicId,
+      attachment.type,
+      attachment.mime,
+    );
+    // Revocation/deletion during a slow provider request must take effect too.
+    const current = await this.posts.findOne(postId, user);
+    if (!current.attachments.some((item) => item.id === attachmentId))
+      throw new NotFoundException();
+    return { buffer, mime: attachment.mime, type: attachment.type };
   }
 
   private withAuthor<T>(

@@ -12,7 +12,11 @@ function serialize(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(serialize);
   if (value !== null && typeof value === 'object') {
     return Object.fromEntries(
-      Object.entries(value).map(([key, entry]) => [key, serialize(entry)]),
+      Object.entries(value)
+        .filter(
+          ([key]) => !['cloudinaryPublicId', 'delivery', 'mime'].includes(key),
+        )
+        .map(([key, entry]) => [key, serialize(entry)]),
     );
   }
   return value;

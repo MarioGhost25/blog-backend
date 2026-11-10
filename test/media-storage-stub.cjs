@@ -3,12 +3,14 @@ if (process.env.NODE_ENV !== 'test' || process.env.MEDIA_TEST_STUB !== 'enabled'
 const { Writable } = require('node:stream');
 const { v2: cloudinary } = require('cloudinary');
 let postAttempt = 0;
-cloudinary.uploader.upload_stream = (options, callback) => new Writable({
-  write(_chunk, _encoding, done) { done(); },
+const assets = new Map();
+cloudinary.uploader.upload_stream = (options, callback) => { const chunks = []; return new Writable({
+  write(chunk, _encoding, done) { chunks.push(Buffer.from(chunk)); done(); },
   final(done) {
-    if (options.folder === 'posts' && postAttempt++ === 0) callback({ message: 'Synthetic private provider failure' });
-    else callback(null, { secure_url: 'http://127.0.0.1:24002/image.png', public_id: `synthetic/${options.folder}` });
+    if (options.public_id?.startsWith('posts/') && postAttempt++ < 3) callback({ message: 'Synthetic private provider failure' });
+    else { assets.set(options.public_id,Buffer.concat(chunks)); callback(null, { secure_url: 'http://127.0.0.1:24002/image.png', public_id: options.public_id ?? `synthetic/${options.folder}` }); }
     done();
   },
-});
-cloudinary.uploader.destroy = async () => ({ result: 'ok' });
+}); };
+cloudinary.utils.private_download_url = id => `data:application/octet-stream;base64,${assets.get(id).toString('base64')}`;
+cloudinary.uploader.destroy = async id => { assets.delete(id); return { result: 'ok' }; };

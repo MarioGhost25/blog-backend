@@ -9,16 +9,19 @@ import { PostsRepository } from './posts.repository';
 import { AttachmentsRepository } from './attachments.repository';
 import { AttachmentStorageService } from './attachment-storage.service';
 import { OptionalPostAuthGuard } from './guards/optional-post-auth.guard';
+import { MediaCleanupService } from './media-cleanup.service';
+import { PersonalFeedController } from './personal-feed.controller';
 
 @Module({
   imports: [AuthModule, PrismaModule, UsersModule],
-  controllers: [PostsController],
+  controllers: [PostsController, PersonalFeedController],
   providers: [
     PostsService,
     AttachmentsService,
     PostsRepository,
     AttachmentsRepository,
     AttachmentStorageService,
+    MediaCleanupService,
     OptionalPostAuthGuard,
   ],
   exports: [PostsService, PostsRepository],

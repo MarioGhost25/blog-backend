@@ -66,6 +66,8 @@ export class AttachmentsRepository {
           titulo: data.title,
           url: data.url,
           cloudinary_public_id: data.cloudinaryPublicId,
+          entrega: data.delivery ?? 'upload',
+          mime: data.mime,
           orden: (maximum._max.orden ?? 0) + 1,
         },
       }),
@@ -126,6 +128,32 @@ export class AttachmentsRepository {
     const attachment = await this.findById(attachmentId);
     if (!attachment) throw new NotFoundException('Attachment not found');
     await this.writer.adjunto.delete({ where: { id_adjunto: attachmentId } });
+    if (attachment.cloudinaryPublicId && attachment.type !== 'link') {
+      const data = {
+        tipo: attachment.type,
+        entrega: attachment.delivery,
+        estado: 'deleting',
+        siguiente_intento: new Date(),
+      };
+      await this.writer.activoMultimedia.upsert({
+        where: { public_id: attachment.cloudinaryPublicId },
+        create: { public_id: attachment.cloudinaryPublicId, ...data },
+        update: data,
+      });
+    }
     return attachment;
+  }
+
+  async linkUpload(publicId: string) {
+    const result = await this.writer.activoMultimedia.updateMany({
+      where: {
+        public_id: publicId,
+        estado: 'pending',
+        siguiente_intento: { gt: new Date() },
+      },
+      data: { estado: 'linked' },
+    });
+    if (result.count !== 1)
+      throw new BadRequestException('Upload expired; please try again');
   }
 }

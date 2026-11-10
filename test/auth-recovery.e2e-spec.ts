@@ -3,7 +3,7 @@ import { Test } from '@nestjs/testing';
 import { ConfigModule } from '@nestjs/config';
 import type { INestApplication } from '@nestjs/common';
 import { randomBytes, createHash, createHmac } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { Client } from 'pg';
 import request from 'supertest';
 import cookieParser from 'cookie-parser';
@@ -50,12 +50,9 @@ describe('auth with real PostgreSQL and local SMTP', () => {
     const database = new Client({ connectionString: url.href });
     await database.connect();
     try {
-      for (const migration of [
-        '20261016223549_init',
-        '20261108000100_generated_search',
-        '20261108000200_business_checks',
-        '20261109000100_post_operations',
-      ]) {
+      for (const migration of readdirSync('prisma/migrations')
+        .filter((name) => /^\d/.test(name))
+        .sort()) {
         await database.query(
           readFileSync(`prisma/migrations/${migration}/migration.sql`, 'utf8'),
         );

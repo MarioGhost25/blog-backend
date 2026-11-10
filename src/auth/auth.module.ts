@@ -1,3 +1,4 @@
+import { ActionOwnerGuard } from './guards/action-owner.guard';
 import { Module } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
@@ -33,9 +34,10 @@ import { APP_GUARD } from '@nestjs/core';
     AuthRepository,
     JwtStrategy,
     JwtAuthGuard,
+    ActionOwnerGuard,
     AuthRateLimitGuard,
     { provide: APP_GUARD, useExisting: AuthRateLimitGuard },
   ],
-  exports: [AuthService, JwtStrategy, JwtAuthGuard],
+  exports: [AuthService, JwtStrategy, JwtAuthGuard, ActionOwnerGuard],
 })
 export class AuthModule {}

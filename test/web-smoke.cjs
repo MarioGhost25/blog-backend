@@ -7,6 +7,7 @@ const { spawn } = require('node:child_process');
 const { once } = require('node:events');
 const assert = require('node:assert/strict');
 const { hash } = require('bcrypt');
+const { connect: connectTcp } = require('node:net');
 const { createServer, request: httpRequest } = require('node:http');
 const { chromium } = require('../../blog-frontend/node_modules/playwright');
 
@@ -17,7 +18,7 @@ const testUrl = 'postgresql://audit:local-test-only@127.0.0.1:55432/blog_test';
 const admin = new Client({ connectionString: testUrl });
 const children = [];
 let browser, created = false;
-const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=', 'base64');
+const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADElEQVQImWP4//8/AAX+Av5Y8msOAAAAAElFTkSuQmCC', 'base64');
 const media = createServer((_req, res) => { res.writeHead(200, { 'Content-Type': 'image/png' }); res.end(png); });
 const identitySecret = randomBytes(32).toString('hex');
 let clientIp = '192.0.2.10';
@@ -31,6 +32,18 @@ const edge = createServer((req, res) => {
   });
   upstream.on('error', () => { res.writeHead(503); res.end(); });
   req.pipe(upstream);
+});
+
+// Production-like same-origin WebSocket proxy; Next handles HTTP/BFF only.
+edge.on('upgrade',(req,socket,head) => {
+  if (req.url !== '/tiempo-real') { socket.destroy(); return; }
+  const upstream = connectTcp(24001,'127.0.0.1',() => {
+    const headers = req.rawHeaders.reduce((text,value,index,all) => index % 2 === 0 ? text + `${value}: ${all[index+1]}\r\n` : text,'');
+    upstream.write(`${req.method} ${req.url} HTTP/1.1\r\n${headers}\r\n`);
+    if (head.length) upstream.write(head);
+    socket.pipe(upstream).pipe(socket);
+  });
+  upstream.on('error',() => socket.destroy()); socket.on('error',() => upstream.destroy()); socket.on('close',() => upstream.destroy());
 });
 
 async function ready(url, child) {
@@ -78,7 +91,7 @@ async function main() {
   const api = start(backend, ['--require', './test/media-storage-stub.cjs', 'dist/src/main.js'], {
     PORT: '24001', DATABASE_URL: url.href, NODE_ENV: 'test', JWT_SECRET: randomBytes(32).toString('hex'),
     SMTP_HOST: '127.0.0.1', SMTP_PORT: '11025', SMTP_FROM: 'test@example.test', SMTP_SECURE: 'false',
-    RECOVERY_URL: 'http://localhost:3016/recuperar', FRONTEND_URL: 'http://localhost:3016',
+    RECOVERY_URL: 'http://localhost:3016/recuperar', FRONTEND_URL: 'http://127.0.0.1:3016',
     MEDIA_TEST_STUB: 'enabled', CLOUDINARY_CLOUD_NAME: 'synthetic', CLOUDINARY_API_KEY: 'synthetic', CLOUDINARY_API_SECRET: 'synthetic',
     BFF_IDENTITY_SECRET: identitySecret,
   });
@@ -237,6 +250,10 @@ async function main() {
   });
   assert.equal(forbiddenEdit.status(), 403);
   assert.equal((await page.request.get('http://127.0.0.1:3016/api/auth/me')).status(), 200);
+  clientIp = '192.0.2.50';
+  let groupIp = 50;
+  await require('./groups-content-smoke.cjs')({browser,groupUrl,png,advanceIp:() => { clientIp = `192.0.2.${++groupIp}`; }});
+  clientIp = '192.0.2.12';
   for (let i = 0; i < 31; i++) {
     const result = await page.request.get('http://127.0.0.1:3016/api/posts?q=matrices', {
       headers: { 'X-Forwarded-For': `203.0.113.${i}`, 'x-blog-client-ip': `203.0.113.${i}` },

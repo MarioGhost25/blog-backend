@@ -114,7 +114,12 @@ export class UsersRepository {
       take: limit + 1,
       include: {
         categoria: true,
-        _count: { select: { comentarios: true, adjuntos: true } },
+        _count: {
+          select: {
+            comentarios: { where: { estado: 'visible' } },
+            adjuntos: true,
+          },
+        },
       },
     });
   }

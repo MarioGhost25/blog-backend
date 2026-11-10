@@ -282,6 +282,8 @@ model Adjunto {
   titulo               String      @db.VarChar(150)
   url                  String      @db.VarChar(1024)
   cloudinary_public_id String?     @db.VarChar(255)
+  entrega              String      @default("upload") @db.VarChar(20)
+  mime                 String?     @db.VarChar(100)
   orden                Int         @default(1)
 
   // FK #6: Publicación a la que pertenece el adjunto (Tabla 23, pág. 77 | Apéndice A, pág. 171)
@@ -290,6 +292,21 @@ model Adjunto {
   // Unicidad de posición del adjunto por publicación (Tabla 24, pág. 80 | Apéndice B, pág. 183)
   @@unique([id_publicacion, orden], map: "uq_adjunto_orden")
   @@map("adjunto")
+}
+
+// Durable upload intent and deletion queue. Created BEFORE contacting storage;
+// linking/unlinking is atomic with the attachment transaction.
+model ActivoMultimedia {
+  public_id String @id @db.VarChar(255)
+  tipo String @db.VarChar(20)
+  entrega String @db.VarChar(20)
+  estado String @default("pending") @db.VarChar(20)
+  intentos Int @default(0)
+  siguiente_intento DateTime @db.Timestamptz(6)
+  fecha_creacion DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([estado, siguiente_intento])
+  @@map("activo_multimedia")
 }
 
 // ----------------------------------------------------------------------------
@@ -485,4 +502,27 @@ model Notificacion {
   @@index([id_comentario], map: "ix_notificacion_comentario")
   @@index([id_reporte], map: "ix_notificacion_reporte")
   @@map("notificacion")
+}
+
+// Append-only record of explicit moderation, also for direct withdrawals.
+model RevisionContenido {
+  id_revision BigInt @id @default(autoincrement())
+  tipo String @db.VarChar(20)
+  id_contenido BigInt
+  id_actor BigInt
+  decision String @db.VarChar(30)
+  observacion String? @db.VarChar(1000)
+  fecha_creacion DateTime @default(now()) @db.Timestamptz(6)
+  @@index([tipo, id_contenido])
+  @@map("revision_contenido")
+}
+
+model PresenciaSala {
+  conexion String @db.Uuid
+  sala String @db.VarChar(80)
+  id_usuario BigInt
+  vence DateTime @db.Timestamptz(6)
+  @@id([conexion,sala])
+  @@index([sala,vence])
+  @@map("presencia_sala")
 }

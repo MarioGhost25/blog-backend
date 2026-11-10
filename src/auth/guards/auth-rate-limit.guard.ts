@@ -35,13 +35,16 @@ export class AuthRateLimitGuard implements CanActivate, OnModuleDestroy {
     // Infrastructure health probes carry no user operation and have their own network controls.
     if (controller === 'AppController' && request.method === 'GET') return true;
     const policy =
-      controller === 'AuthController'
-        ? this.policies[operation]
-        : controller === 'PostsController' &&
-            (operation === 'search' ||
-              (operation === 'findPublicFeed' && request.query.q !== undefined))
-          ? { limit: 30, duration: 60000 }
-          : undefined;
+      controller === 'ModerationController' && operation === 'report'
+        ? { limit: 10, duration: 3600000 }
+        : controller === 'AuthController'
+          ? this.policies[operation]
+          : controller === 'PostsController' &&
+              (operation === 'search' ||
+                (operation === 'findPublicFeed' &&
+                  request.query.q !== undefined))
+            ? { limit: 30, duration: 60000 }
+            : undefined;
     const now = Date.now();
     for (const [key, bucket] of this.buckets) {
       if (bucket.until <= now) this.buckets.delete(key);

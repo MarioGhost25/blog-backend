@@ -1,6 +1,7 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { notify } from '../notifications/notification-writer';
 import { mapAttachment } from './mappers/attachment';
 import type { PostStatus, PostWrite } from './types/posts.types';
 import type { OperationInput } from './types/post-operation';
@@ -58,7 +59,15 @@ function mapPost(row: PostRow) {
     group: row.grupo
       ? { id: row.grupo.id_grupo, name: row.grupo.nombre }
       : null,
-    attachments: row.adjuntos.map(mapAttachment),
+    attachments: row.adjuntos.map((attachment) => ({
+      ...mapAttachment(attachment),
+      // Never disclose legacy public provider URLs belonging to private groups.
+      ...(row.id_grupo !== null && attachment.tipo !== 'enlace'
+        ? {
+            url: `/api/v1/posts/${row.id_publicacion}/attachments/${attachment.id_adjunto}/content`,
+          }
+        : {}),
+    })),
     commentCount: row._count.comentarios,
   };
 }
@@ -186,7 +195,7 @@ export class PostsRepository {
   }
 
   async create(data: PostWrite) {
-    return mapPost(
+    const post = mapPost(
       await this.db.publicacion.create({
         data: {
           id_autor: data.authorId,
@@ -199,6 +208,20 @@ export class PostsRepository {
         include,
       }),
     );
+    if (post.groupId && post.status === 'visible' && this.transaction) {
+      const members = await this.db.miembroGrupo.findMany({
+        where: { id_grupo: post.groupId },
+        select: { id_usuario: true },
+      });
+      await notify(
+        this.transaction,
+        'publicacion_grupo',
+        members.map((m) => m.id_usuario),
+        post.authorId,
+        { postId: post.id },
+      );
+    }
+    return post;
   }
 
   async findById(postId: bigint) {
@@ -216,6 +239,24 @@ export class PostsRepository {
   }) {
     return this.feed(
       { id_grupo: null, id_categoria: filters.categoryId, estado: 'visible' },
+      filters.cursor,
+      filters.limit,
+    );
+  }
+
+  findPersonalFeedCursor(
+    userId: bigint,
+    filters: { categoryId?: bigint; cursor?: bigint; limit: number },
+  ) {
+    return this.feed(
+      {
+        estado: 'visible',
+        id_categoria: filters.categoryId,
+        OR: [
+          { id_grupo: null },
+          { grupo: { miembros: { some: { id_usuario: userId } } } },
+        ],
+      },
       filters.cursor,
       filters.limit,
     );
@@ -316,6 +357,28 @@ export class PostsRepository {
         version: { increment: 1 },
         fecha_edicion: new Date(),
       },
+    });
+  }
+
+  async recordRemoval(
+    postId: bigint,
+    actor: bigint,
+    author: bigint,
+    observation: string,
+  ) {
+    if (!this.transaction)
+      throw new Error('Moderation requires parent transaction');
+    await this.transaction.revisionContenido.create({
+      data: {
+        tipo: 'post',
+        id_contenido: postId,
+        id_actor: actor,
+        decision: 'remove',
+        observacion: observation,
+      },
+    });
+    await notify(this.transaction, 'contenido_retirado', [author], actor, {
+      postId,
     });
   }
 
