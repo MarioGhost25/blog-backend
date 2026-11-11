@@ -1,3 +1,4 @@
+import { AdminModule } from './admin/admin.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { ModerationModule } from './moderation/moderation.module';
 import { NotificationsModule } from './notifications/notifications.module';
@@ -20,6 +21,7 @@ import { PostsModule } from './posts/posts.module';
       validationSchema: joiValidationSchema,
     }),
     AuthModule,
+    AdminModule,
     CategoriesModule,
     GroupsModule,
     UsersModule,

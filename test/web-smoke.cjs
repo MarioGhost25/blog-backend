@@ -62,6 +62,26 @@ function start(cwd, args, env) {
   children.push(child);
   return child;
 }
+async function adminSmoke(databaseUrl) {
+  const panelDb = new Client({connectionString:databaseUrl}); await panelDb.connect();
+  try { await panelDb.query("UPDATE usuario SET rol='administrador' WHERE correo='other@example.test'"); } finally { await panelDb.end(); }
+  const panelContext = await browser.newContext(); const panel = await panelContext.newPage();
+  try {
+    assert.equal((await panel.request.post('http://127.0.0.1:3016/api/auth/login',{headers:{Origin:'http://127.0.0.1:3016'},data:{email:'other@example.test',password:'Local-test-42!'}})).status(),200);
+    await panel.goto('http://127.0.0.1:3016/admin');
+    await panel.getByRole('heading',{name:'Administración global',exact:true}).waitFor();
+    await panel.goto('http://127.0.0.1:3016/admin/usuarios?q=Synthetic');
+    const row=panel.getByRole('listitem').filter({hasText:'Synthetic Student'});
+    await row.getByLabel('Motivo',{exact:true}).fill('Suspensión administrativa de prueba');
+    panel.once('dialog',d=>d.accept()); await row.getByRole('button',{name:'Suspender',exact:true}).click();
+    try { await row.getByRole('button',{name:'Reactivar',exact:true}).waitFor(); } catch(error) { console.error('ADMIN_UI',await panel.locator('main').innerText()); throw error; }
+    panel.once('dialog',d=>d.accept()); await row.getByRole('button',{name:'Reactivar',exact:true}).click();
+    await row.getByRole('button',{name:'Suspender',exact:true}).waitFor();
+    await panel.goto('http://127.0.0.1:3016/admin/publicaciones');
+    await panel.getByRole('heading',{name:'Publicaciones',exact:true}).waitFor();
+    console.log('PASS browser: administrative summary, user search, manual suspension/reactivation and global group content.');
+  } finally { await panelContext.close(); }
+}
 async function main() {
   // Do not accidentally test a stale/unrelated server after a failed run.
   for (const port of [24001, 3017]) {
@@ -110,6 +130,7 @@ async function main() {
   assert.equal((await fetch('http://127.0.0.1:3016/publicaciones/999999')).status, 404);
   assert.equal((await fetch('http://127.0.0.1:3016/api/users/me/posts')).status, 401);
   browser = await chromium.launch({ headless: true });
+  if (process.argv.includes('--admin-only')) { clientIp='192.0.2.70'; await adminSmoke(url.href); return; }
   const context = await browser.newContext();
   const page = await context.newPage();
   const problems = [];
@@ -157,8 +178,10 @@ async function main() {
   await otherPage.getByRole('button', { name: 'Salir del grupo' }).click();
   await otherPage.getByRole('button', { name: 'Unirme al grupo' }).waitFor();
   await otherContext.close();
+  clientIp = '192.0.2.14';
   await page.goto('http://127.0.0.1:3016/perfil');
-  await page.getByLabel('Foto de perfil', { exact: true }).setInputFiles({ name: 'profile.png', mimeType: 'image/png', buffer: png });
+  // Streaming SSR can temporarily retain an identical input in a hidden segment.
+  await page.getByLabel('Foto de perfil', { exact: true }).filter({visible:true}).setInputFiles({ name: 'profile.png', mimeType: 'image/png', buffer: png });
   const photoResponse = page.waitForResponse(r => r.url().endsWith('/api/users/me/photo') && r.request().method() === 'PUT');
   await page.getByRole('button', { name: 'Guardar foto', exact: true }).click();
   assert.equal((await photoResponse).status(), 200);
@@ -253,6 +276,8 @@ async function main() {
   clientIp = '192.0.2.50';
   let groupIp = 50;
   await require('./groups-content-smoke.cjs')({browser,groupUrl,png,advanceIp:() => { clientIp = `192.0.2.${++groupIp}`; }});
+  clientIp = '192.0.2.70';
+  await adminSmoke(url.href);
   clientIp = '192.0.2.12';
   for (let i = 0; i < 31; i++) {
     const result = await page.request.get('http://127.0.0.1:3016/api/posts?q=matrices', {
@@ -271,7 +296,7 @@ async function main() {
   assert.equal(problems.length, 0);
   console.log('PASS browser: content/auth/media and publication recovery; draft navigation, lost POST/PATCH/DELETE replies, session recovery/account isolation; trusted edge -> BFF signature -> Nest; spoofed headers ignored, per-client search budgets, Retry-After and correlation. Media provider stubbed locally.');
 }
-main().catch(error => { console.error(error.message); process.exitCode = 1; }).finally(async () => {
+main().catch(error => { console.error(error.stack ?? error.message); process.exitCode = 1; }).finally(async () => {
   if (browser) await browser.close();
   media.close();
   edge.close();

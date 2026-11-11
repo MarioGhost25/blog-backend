@@ -42,7 +42,7 @@ export class ResolveReportDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(30)
+  @Max(90)
   suspensionDays?: number;
 }
 export class ReviewDto {

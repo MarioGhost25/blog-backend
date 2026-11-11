@@ -80,3 +80,8 @@ filtrados y conservación de la publicación tras un fallo de almacenamiento.
 La integración HTTP independiente comprueba el 503 sin configuración y que no
 cambia la foto anterior. La entrega a Cloudinary real no está verificada hasta
 configurar credenciales y probarla con autorización sobre ese entorno.
+
+
+## Actualización de adjuntos, 10/11/2026
+
+Los adjuntos de publicaciones ahora admiten imagen/PDF/enlace y orden; los archivos nuevos usan entrega autenticada, validación binaria y descarga autorizada por la aplicación. La gestión de fotos de perfil mantiene el flujo anterior descrito en esta guía. Para migraciones, cola durable y recursos grupales públicos heredados, prevalece [la guía operativa actual](../../docs/OPERACION_PUBLICACIONES_GRUPOS.md); no basta con cambiar una URL en el frontend. El proveedor real no se ejercitó en el smoke de esta revisión.

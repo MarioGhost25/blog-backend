@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { reactivateExpiredAccounts } from './account-suspension';
 
 const userProfileSelect = {
   id_usuario: true,
@@ -50,19 +51,7 @@ export class AuthRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async findById(id: bigint): Promise<UserProfile | null> {
-    await this.prisma.usuario.updateMany({
-      where: {
-        id_usuario: id,
-        estado: 'suspendido',
-        suspendido_hasta: { lte: new Date() },
-      },
-      data: {
-        estado: 'activo',
-        suspendido_hasta: null,
-        suspendido_por: null,
-        motivo_suspension: null,
-      },
-    });
+    await reactivateExpiredAccounts(this.prisma, { id_usuario: id });
     const user = await this.prisma.usuario.findUnique({
       where: { id_usuario: id },
       select: userProfileSelect,
@@ -73,19 +62,7 @@ export class AuthRepository {
   async findByEmail(
     email: string,
   ): Promise<(UserProfile & { passwordHash: string }) | null> {
-    await this.prisma.usuario.updateMany({
-      where: {
-        correo: email,
-        estado: 'suspendido',
-        suspendido_hasta: { lte: new Date() },
-      },
-      data: {
-        estado: 'activo',
-        suspendido_hasta: null,
-        suspendido_por: null,
-        motivo_suspension: null,
-      },
-    });
+    await reactivateExpiredAccounts(this.prisma, { correo: email });
     const user = await this.prisma.usuario.findUnique({
       where: { correo: email },
       select: { ...userProfileSelect, contrasena_hash: true },

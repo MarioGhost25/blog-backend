@@ -15,9 +15,27 @@ export class NotificationsRepository {
       include: {
         publicacion: { select: { id_publicacion: true } },
         comentario: { select: { id_publicacion: true, estado: true } },
-        reporte: { select: { id_reportante: true, estado: true } },
+        reporte: {
+          select: {
+            id_reportante: true,
+            estado: true,
+            publicacion: { select: { id_grupo: true } },
+            comentario: {
+              select: { publicacion: { select: { id_grupo: true } } },
+            },
+          },
+        },
       },
     });
+  }
+  async canModerateGroup(userId: bigint, groupId: bigint) {
+    const membership = await this.prisma.miembroGrupo.findUnique({
+      where: { id_grupo_id_usuario: { id_grupo: groupId, id_usuario: userId } },
+      select: { rol: true },
+    });
+    return (
+      membership?.rol === 'administrador' || membership?.rol === 'moderador'
+    );
   }
   count(userId: bigint) {
     return this.prisma.notificacion.count({

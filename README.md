@@ -112,3 +112,10 @@ solo incluye publicaciones públicas visibles. Ver [contrato completo](../docs/c
 ## Seguridad HTTP y proxy
 
 Límites globales/auth/búsqueda, firma de identidad del BFF, errores con correlación y auditoría HTTP: [configuración y límites operativos](docs/SEGURIDAD_Y_PROXY.md). El store actual es de una sola instancia. Activar la fuente de IP requiere verificar el proxy real; no confiar en cabeceras enviadas directamente por el navegador. Producción exige JWT_SECRET de al menos 32 caracteres.
+
+
+## Publicaciones y grupos — revisión del 10/11/2026
+
+La entrega integra grupos/integrantes/muro, publicación grupal, imagen/PDF/enlace privados nuevos, conversación, tiempo real, moderación y notificaciones. Ver [alcance y evidencia](../docs/AVANCE_PUBLICACIONES_GRUPOS_2026-11-10.md), [contratos actuales](../docs/contratos-api.md) y [migraciones/proxy/operación](../docs/OPERACION_PUBLICACIONES_GRUPOS.md). La configuración real y los recursos públicos heredados requieren los pasos operativos de esa guía. El panel global AD01 sigue pendiente.
+
+Contrato C01 y pruebas contra respuestas HTTP sintéticas: [documentación](docs/contracts/README.md).

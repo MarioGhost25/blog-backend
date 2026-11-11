@@ -17,6 +17,31 @@ export class NotificationsService {
     const items = await Promise.all(
       rows.slice(0, 20).map(async (row) => {
         let href: string | null = null;
+        let message = notificationMessages[row.tipo];
+        if (
+          row.tipo === 'resultado_reporte' &&
+          row.reporte?.id_reportante === user.id
+        ) {
+          const outcomes = {
+            pendiente: 'Tu reporte está pendiente de revisión.',
+            desestimado: 'Tu reporte fue revisado y desestimado.',
+            contenido_retirado: 'Se retiró el contenido de tu reporte.',
+            usuario_suspendido:
+              'Se retiró el contenido de tu reporte y se suspendió a su autor.',
+          };
+          message = outcomes[row.reporte.estado];
+        }
+        if (row.tipo === 'nuevo_reporte' && row.reporte) {
+          const groupId =
+            row.reporte.publicacion?.id_grupo ??
+            row.reporte.comentario?.publicacion.id_grupo;
+          if (user.role === 'administrador') href = '/moderacion';
+          else if (
+            groupId &&
+            (await this.repository.canModerateGroup(user.id, groupId))
+          )
+            href = `/grupos/${groupId}/moderacion`;
+        }
         const postId =
           row.publicacion?.id_publicacion ?? row.comentario?.id_publicacion;
         if (postId && (!row.comentario || row.comentario.estado === 'visible'))
@@ -29,7 +54,7 @@ export class NotificationsService {
         return {
           id: row.id_notificacion,
           type: row.tipo,
-          message: notificationMessages[row.tipo],
+          message,
           href,
           createdAt: row.fecha_creacion,
           readAt: row.fecha_lectura,

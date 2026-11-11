@@ -20,7 +20,7 @@ límites específicos. /posts/search y /posts?q=… comparten el presupuesto de 
 La comprobación de salud del AppController queda exenta. Los límites son ventanas
 fijas iniciadas por la primera petición, con máximo de 10000 contadores en memoria.
 Los contadores se pierden al reiniciar Nest; no hay almacenamiento compartido.
-El futuro endpoint de reportes debe incorporar 10/h cuando se implemente O01.
+Reportes ya incorpora 10 intentos/hora por IP en el guard y 10 creaciones/hora por cuenta en PostgreSQL, con lock transaccional compartido entre instancias. Los demás límites siguen en memoria.
 
 ## Identidad entre Next y Nest
 

@@ -41,7 +41,7 @@ datos reales, aunque su nombre termine en `_test`.
   esperas reales con `pg_blocking_pids` antes de revocar permisos y liberar el lock.
   Solo sustituye el proveedor de archivos: prueba revocación durante subida,
   compensación y desvinculación confirmada antes de una limpieza externa fallida.
-  No acredita URLs privadas ni limpieza durable. No necesita correo.
+  Ahora verifica también descarga autorizada/revocación durante lectura, validación binaria y cola durable. El proveedor se sustituye; no acredita la configuración Cloudinary externa. Incluye comentarios, reportes, retenidos, notificaciones, suspensión y dos instancias WebSocket. No necesita correo.
 - `esm-transformer.cjs`: adaptación de dependencias ESM a Jest 29; la clave de
   caché incluye el propio transformador y la configuración.
 
@@ -93,3 +93,25 @@ ampliado aprobado**, ejecutados contra el compose aislado mediante los comandos
 autorizados. Incluye aplicación de todas las migraciones en bases temporales. La
 suite adicional del frontend con Postman no inició por `connect EPERM` en 4020;
 sus 35 casos no se cuentan como aprobados. Informe: [entrega P03](../../docs/ENTREGA_P03_2026-11-09.md).
+
+
+## Revisión del 10/11/2026
+
+La regresión actual contiene **89 pruebas SQL/HTTP/WebSocket** aprobadas, 33 unitarias backend y 71 frontend. Los números del 9/11 arriba son históricos. `auth-recovery` y `group-access` aplican todas las migraciones numeradas a su base temporal.
+
+`groups-content-smoke.cjs` se ejecuta dentro de `web-smoke.cjs`: dos navegadores, roles/transferencia, publicación privada, imagen/PDF/enlace y orden, comentarios/respuestas en vivo, borrador tras expirar sesión, retirada con observación, reportes/retenidos y avisos. El proxy de prueba encamina upgrades `/tiempo-real` directamente a Nest, con Origin/cookie reales. El stub sirve bytes del archivo subido únicamente al servidor de prueba; no es una configuración de producción.
+
+El script guarda capturas de muro escritorio/móvil y transferencia en `.tmp/screenshots/`; ante un fallo de grupos, conserva una captura sintética de diagnóstico. Los cambios de IP del fixture separan escenarios funcionales del presupuesto global; los casos específicos de límites siguen usando la misma IP y cabeceras falsas para verificar 429.
+
+El smoke Chromium completo pasó y se inspeccionaron las capturas móvil/escritorio/transferencia. Evidencia y límites: [entrega de publicaciones/grupos](../../docs/AVANCE_PUBLICACIONES_GRUPOS_2026-11-10.md). Guía del proxy y trabajadores: [operación](../../docs/OPERACION_PUBLICACIONES_GRUPOS.md).
+
+
+## Administración global AD01
+
+`node test/web-smoke.cjs --admin-only` inicia el mismo entorno aislado y ejecuta únicamente resumen, búsqueda de usuarios, suspensión/reactivación manual y listado global de publicaciones. El smoke completo incluye también este recorrido después de grupos. La elevación de rol se hace únicamente dentro de la base sintética recién creada por el fixture. No modifica cuentas de desarrollo o producción.
+
+La suite SQL contiene 90 casos, incluido acceso global frente a usuario/administrador local, filtros, rechazo de autosuspensión/duración inválida y recuperación del acceso después de reactivar. Evidencia actual: [entrega AD01](../../docs/ENTREGA_AD01.md).
+
+## Contratos C01
+
+`npm run contracts:check` valida el OpenAPI generado, inventario de 42 operaciones y fixtures. El helper HTTP de `group-access.e2e-spec.ts` valida respuestas contra esos esquemas y captura ejemplos en `.tmp/contracts/http-fixtures.json`. Publicar sólo capturas de la base sintética aprobada; ver [mantenimiento](../docs/contracts/README.md). Última regresión C01: 91/91; una ejecución previa falló en recuperación concurrente y sigue registrada en [la entrega](../../docs/ENTREGA_C01.md).

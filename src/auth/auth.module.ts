@@ -1,4 +1,5 @@
 import { ActionOwnerGuard } from './guards/action-owner.guard';
+import { SuspensionExpiryService } from './suspension-expiry.service';
 import { Module } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
@@ -32,6 +33,7 @@ import { APP_GUARD } from '@nestjs/core';
   providers: [
     AuthService,
     AuthRepository,
+    SuspensionExpiryService,
     JwtStrategy,
     JwtAuthGuard,
     ActionOwnerGuard,

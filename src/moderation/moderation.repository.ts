@@ -1,9 +1,10 @@
-import { ForbiddenException, HttpException, Injectable } from '@nestjs/common';
+import { HttpException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { lockPostHierarchy } from '../common/database/content-locks';
 import { notify } from '../notifications/notification-writer';
+import { suspendAccount } from '../auth/account-suspension';
 const postSelect = {
   id_publicacion: true,
   id_autor: true,
@@ -272,21 +273,7 @@ export class ModerationRepository {
     });
   }
   async suspend(id: bigint, actor: bigint, days: number, reason: string) {
-    await this.tx!.$queryRaw`SELECT pg_advisory_xact_lock(61110001)::text`;
-    const current = await this.tx!.usuario.findUnique({
-      where: { id_usuario: actor },
-      select: { estado: true, rol: true },
-    });
-    if (current?.estado !== 'activo' || current.rol !== 'administrador')
-      throw new ForbiddenException();
-    await this.tx!.usuario.update({
-      where: { id_usuario: id },
-      data: {
-        estado: 'suspendido',
-        suspendido_hasta: new Date(Date.now() + days * 86400000),
-        suspendido_por: actor,
-        motivo_suspension: reason,
-      },
-    });
+    if (!this.tx) throw new Error('Suspension requires a transaction');
+    await suspendAccount(this.tx, id, actor, days, reason);
   }
 }

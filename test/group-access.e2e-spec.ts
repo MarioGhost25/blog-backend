@@ -1,3 +1,5 @@
+import { createRequire } from 'node:module';
+import { AdminModule } from '../src/admin/admin.module';
 import { CommentsModule } from '../src/comments/comments.module';
 import { NotificationsModule } from '../src/notifications/notifications.module';
 import { ModerationModule } from '../src/moderation/moderation.module';
@@ -15,6 +17,7 @@ import { Client } from 'pg';
 import request from 'supertest';
 import cookieParser from 'cookie-parser';
 import { AuthModule } from '../src/auth/auth.module';
+import { SuspensionExpiryService } from '../src/auth/suspension-expiry.service';
 import { AuthRateLimitGuard } from '../src/auth/guards/auth-rate-limit.guard';
 import { GroupsModule } from '../src/groups/groups.module';
 import { PostsModule } from '../src/posts/posts.module';
@@ -25,6 +28,19 @@ import { AttachmentStorageService } from '../src/posts/attachment-storage.servic
 import { PrismaService } from '../src/prisma/prisma.service';
 import { createApiValidationPipe } from '../src/common/validation/api-validation.pipe';
 import { configureHttpSecurity } from '../src/common/security/http-security';
+
+const { assertResponse, writeCaptured } = createRequire(__filename)(
+  './contract-validator.cjs',
+) as {
+  assertResponse: (
+    method: string,
+    path: string,
+    status: number,
+    body: unknown,
+    capture: boolean,
+  ) => void;
+  writeCaptured: (path: string) => void;
+};
 
 type PageBody = {
   items: { postId: string; user?: { userId: string } }[];
@@ -79,10 +95,14 @@ describe('G02 roles, privacy and revocation with real PostgreSQL/HTTP', () => {
     const call = request(app.getHttpServer() as Server)[method](
       `/api/v1${path}`,
     );
+    call.expect((response) => {
+      assertResponse(method, path, response.status, response.body, true);
+    });
     if (method === 'delete' && /^\/posts\/\d+$/.test(path))
       call.send({ observation: 'Synthetic moderation reason' });
     return actor === undefined ? call : call.set('Cookie', cookies.get(actor)!);
   };
+  afterAll(() => writeCaptured('.tmp/contracts/http-fixtures.json'));
   const resetRates = () => app.get(AuthRateLimitGuard).onModuleDestroy();
 
   beforeAll(async () => {
@@ -139,6 +159,7 @@ describe('G02 roles, privacy and revocation with real PostgreSQL/HTTP', () => {
           ],
         }),
         AuthModule,
+        AdminModule,
         GroupsModule,
         CommentsModule,
         NotificationsModule,
@@ -435,6 +456,32 @@ describe('G02 roles, privacy and revocation with real PostgreSQL/HTTP', () => {
       );
     },
   );
+
+  it('validates catalog, group list, report detail and receipts against C01', async () => {
+    await http('get', '/categories').expect(200);
+    await http('get', '/groups', 2).expect(200);
+    const report = await http('post', '/reports', 3)
+      .send({ postId: String(f.visible), reason: 'Synthetic contract report' })
+      .expect(201);
+    const reportId = (report.body as { id: string }).id;
+    await http('get', `/moderation/reports/${reportId}`, 6).expect(200);
+    const key = '12345678-1234-4123-8123-123456789abc';
+    await http('get', `/posts/operations/${key}`, 2)
+      .set('X-Post-Owner', '2')
+      .expect(200);
+    await http('post', '/posts', 2)
+      .set('X-Post-Owner', '2')
+      .set('Idempotency-Key', key)
+      .send({
+        title: 'Synthetic receipt',
+        content: 'Contract content',
+        categoryId: 1,
+      })
+      .expect(201);
+    await http('get', `/posts/operations/${key}`, 2)
+      .set('X-Post-Owner', '2')
+      .expect(200);
+  });
 
   it('rejects visitors/suspended accounts and keeps public reading independent of membership', async () => {
     for (const path of [
@@ -1272,6 +1319,10 @@ describe('G02 roles, privacy and revocation with real PostgreSQL/HTTP', () => {
     expect(results.map((r) => r.status).sort()).toEqual([201, 409]);
     const id = (results.find((r) => r.status === 201)!.body as { id: string })
       .id;
+    const notices = await http('get', '/notifications', 4).expect(200);
+    expect(notices.body).toMatchObject({
+      items: [{ type: 'nuevo_reporte', href: `/grupos/${f.a}/moderacion` }],
+    });
     await http('post', '/reports', 5)
       .send({ postId: String(f.visible), reason: 'No tengo acceso' })
       .expect(403);
@@ -1295,6 +1346,17 @@ describe('G02 roles, privacy and revocation with real PostgreSQL/HTTP', () => {
         where: { tipo: 'resultado_reporte', id_destinatario: 3n },
       }),
     ).toBe(1);
+    expect(
+      (await http('get', '/notifications', 3).expect(200)).body,
+    ).toMatchObject({
+      items: [
+        {
+          type: 'resultado_reporte',
+          message: 'Se retiró el contenido de tu reporte.',
+          href: null,
+        },
+      ],
+    });
     expect(
       await prisma.notificacion.count({
         where: { tipo: 'contenido_retirado', id_destinatario: 2n },
@@ -1326,8 +1388,15 @@ describe('G02 roles, privacy and revocation with real PostgreSQL/HTTP', () => {
     await http('patch', `/moderation/reports/${id}`, 6)
       .send({
         decision: 'usuario_suspendido',
-        observation: 'Motivo de suspensión',
+        observation: 'x'.repeat(501),
         suspensionDays: 1,
+      })
+      .expect(400);
+    await http('patch', `/moderation/reports/${id}`, 6)
+      .send({
+        decision: 'usuario_suspendido',
+        observation: 'Motivo de suspensión',
+        suspensionDays: 90,
       })
       .expect(204);
     await http('get', '/users/me', 2).expect(403);
@@ -1336,6 +1405,119 @@ describe('G02 roles, privacy and revocation with real PostgreSQL/HTTP', () => {
       data: { suspendido_hasta: new Date(Date.now() - 1000) },
     });
     await http('get', '/users/me', 2).expect(200);
+  });
+
+  it('enforces the shared report budget atomically across concurrent targets', async () => {
+    for (let i = 0; i < 9; i++) {
+      const post = await prisma.publicacion.create({
+        data: {
+          id_autor: 2n,
+          id_categoria: 1n,
+          titulo: `Report budget ${i}`,
+          contenido: 'Synthetic content',
+        },
+      });
+      await prisma.reporte.create({
+        data: {
+          id_reportante: 3n,
+          id_publicacion: post.id_publicacion,
+          motivo: 'Synthetic existing report',
+        },
+      });
+    }
+    resetRates();
+    const results = await Promise.all(
+      [f.visible, f.publicPost].map((id) =>
+        http('post', '/reports', 3).send({
+          postId: String(id),
+          reason: 'Report budget concurrency',
+        }),
+      ),
+    );
+    expect(results.map((r) => r.status).sort()).toEqual([201, 429]);
+    expect(await prisma.reporte.count({ where: { id_reportante: 3n } })).toBe(
+      10,
+    );
+  });
+
+  it('restricts the global panel and applies manual suspension/reactivation', async () => {
+    await http('get', '/admin/summary', 1).expect(403);
+    await http('get', '/admin/users', 4).expect(403);
+    await http('get', '/admin/posts', 2).expect(403);
+    const summary = await http('get', '/admin/summary?days=30', 6).expect(200);
+    expect(summary.body).toMatchObject({ days: 30, users: 10 });
+    await http('get', '/admin/summary?days=99', 6).expect(400);
+    await http(
+      'get',
+      '/admin/users?role=administrador&status=activo',
+      6,
+    ).expect(200);
+    await http('get', '/admin/posts?scope=group&status=retenido', 6).expect(
+      200,
+    );
+    await http('patch', '/admin/users/3/suspension', 4)
+      .send({ days: 7, reason: 'Valid reason' })
+      .expect(403);
+    await http('patch', '/admin/users/6/suspension', 6)
+      .send({ days: 7, reason: 'Valid reason' })
+      .expect(400);
+    await http('patch', '/admin/users/3/suspension', 6)
+      .send({ days: 91, reason: 'Valid reason' })
+      .expect(400);
+    await http('patch', '/admin/users/3/suspension', 6)
+      .send({ days: 7, reason: 'Manual test suspension' })
+      .expect(204);
+    await http('get', '/users/me', 3).expect(403);
+    await http('delete', '/admin/users/3/suspension', 6).expect(204);
+    await http('get', '/users/me', 3).expect(200);
+    expect(
+      await prisma.usuario.findUnique({ where: { id_usuario: 3n } }),
+    ).toMatchObject({
+      estado: 'activo',
+      suspendido_hasta: null,
+      motivo_suspension: null,
+      suspendido_por: null,
+    });
+  });
+
+  it('expires suspensions in the scheduled sweep without clearing renewed suspensions', async () => {
+    await prisma.usuario.update({
+      where: { id_usuario: 2n },
+      data: {
+        estado: 'suspendido',
+        suspendido_por: 6n,
+        motivo_suspension: 'Expired synthetic suspension',
+        suspendido_hasta: new Date(Date.now() - 1000),
+      },
+    });
+    await prisma.usuario.update({
+      where: { id_usuario: 3n },
+      data: {
+        estado: 'suspendido',
+        suspendido_por: 6n,
+        motivo_suspension: 'Renewed synthetic suspension',
+        suspendido_hasta: new Date(Date.now() + 86400000),
+      },
+    });
+    await app.get(SuspensionExpiryService).sweep();
+    expect(
+      await prisma.usuario.findUnique({ where: { id_usuario: 2n } }),
+    ).toMatchObject({
+      estado: 'activo',
+      suspendido_hasta: null,
+      suspendido_por: null,
+      motivo_suspension: null,
+    });
+    expect(
+      await prisma.usuario.findUnique({ where: { id_usuario: 3n } }),
+    ).toMatchObject({
+      estado: 'suspendido',
+      suspendido_por: 6n,
+      motivo_suspension: 'Renewed synthetic suspension',
+    });
+    await app.get(SuspensionExpiryService).sweep();
+    await http('get', '/users/me', 2).expect(200);
+    await http('get', '/users/me', 3).expect(403);
   });
 
   it('keeps notification destinations neutral after revocation and scopes read state to its recipient', async () => {
