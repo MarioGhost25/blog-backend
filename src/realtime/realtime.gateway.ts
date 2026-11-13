@@ -8,19 +8,18 @@ import { HttpAdapterHost } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { randomUUID } from 'node:crypto';
-import type { IncomingMessage, Server } from 'node:http';
-import type { Duplex } from 'node:stream';
-import { WebSocket, WebSocketServer, type RawData } from 'ws';
+import type { Server } from 'node:http';
+import { Server as SocketServer, Socket } from 'socket.io';
 import { Client } from 'pg';
 import { JwtStrategy } from '../auth/strategies/jwt.strategy';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
-import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeRepository } from './realtime.repository';
 import { PostsService } from '../posts/posts.service';
 import { PostsRepository } from '../posts/posts.repository';
 import { parsePostId } from '../posts/utils/post-id';
 interface Connection {
   id: string;
-  socket: WebSocket;
+  socket: Socket;
   user: AuthenticatedUser;
   claims: unknown;
   expires: number;
@@ -40,12 +39,8 @@ interface Change {
 @Injectable()
 export class RealtimeGateway implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RealtimeGateway.name);
-  private readonly server = new WebSocketServer({
-    noServer: true,
-    maxPayload: 4096,
-    perMessageDeflate: false,
-  });
-  private readonly connections = new Map<WebSocket, Connection>();
+  private server!: SocketServer;
+  private readonly connections = new Map<Socket, Connection>();
   private readonly upgrades = new Map<
     string,
     { count: number; until: number }
@@ -58,24 +53,69 @@ export class RealtimeGateway implements OnModuleInit, OnModuleDestroy {
   private stopped = false;
   private ticking = false;
   private http?: Server;
-  private readonly upgrade = (
-    request: IncomingMessage,
-    socket: Duplex,
-    head: Buffer,
-  ) => {
-    void this.accept(request, socket, head);
-  };
   constructor(
     private readonly adapter: HttpAdapterHost,
     private readonly config: ConfigService,
     private readonly strategy: JwtStrategy,
-    private readonly prisma: PrismaService,
+    private readonly presenceRepository: RealtimeRepository,
     private readonly posts: PostsService,
     private readonly repository: PostsRepository,
   ) {}
   async onModuleInit() {
     this.http = this.adapter.httpAdapter.getHttpServer() as Server;
-    this.http.on('upgrade', this.upgrade);
+    this.server = new SocketServer(this.http, {
+      maxHttpBufferSize: 4096,
+      cors: {
+        origin:
+          this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3000',
+        credentials: true,
+      },
+      allowRequest: (request, done) =>
+        done(
+          null,
+          request.headers.origin ===
+            new URL(
+              this.config.get<string>('FRONTEND_URL') ??
+                'http://localhost:3000',
+            ).origin,
+        ),
+    });
+    const namespace = this.server.of('/realtime');
+    namespace.use((socket, next) => {
+      void this.accept(socket).then(
+        () => next(),
+        () => next(new Error('Unauthorized')),
+      );
+    });
+    namespace.on('connection', (socket) => {
+      const connection = socket.data.connection as Connection;
+      this.connections.set(socket, connection);
+      void socket.join(`user:${connection.user.id}`);
+      for (const event of ['room:join', 'room:leave'])
+        socket.on(event, (data) => {
+          const now = Date.now();
+          if (now - connection.since > 60000) {
+            connection.since = now;
+            connection.messages = 0;
+          }
+          if (++connection.messages > 30) {
+            socket.disconnect(true);
+            return;
+          }
+          connection.queue = connection.queue
+            .then(() => this.message(connection, { event, data }))
+            .catch(() => {
+              this.send(connection, 'error', { message: 'Invalid request' });
+            });
+        });
+      socket.on('disconnect', () => {
+        this.connections.delete(socket);
+        void this.presenceRepository
+          .removePresence({ where: { conexion: connection.id } })
+          .catch(() => undefined);
+      });
+      this.send(connection, 'connection:ready', {});
+    });
     await this.listen();
     this.heartbeat = setInterval(() => {
       void this.tick();
@@ -94,7 +134,7 @@ export class RealtimeGateway implements OnModuleInit, OnModuleDestroy {
     client.on('error', () => {
       this.logger.warn('Realtime database listener disconnected');
       for (const connection of this.connections.values())
-        connection.socket.close(1012, 'Reconnecting');
+        connection.socket.disconnect(true);
       void client.end().catch(() => undefined);
       if (!this.stopped && !this.reconnect)
         this.reconnect = setTimeout(() => {
@@ -106,6 +146,24 @@ export class RealtimeGateway implements OnModuleInit, OnModuleDestroy {
       try {
         const change = JSON.parse(message.payload ?? '') as Change;
         if (typeof change.event !== 'string') return;
+        change.event =
+          (
+            {
+              'publicacion:nueva': 'post:new',
+              'publicacion:actualizada': 'post:updated',
+              'comentario:nuevo': 'comment:new',
+              'comentario:retirado': 'comment:removed',
+              'acceso:actualizado': 'access:updated',
+              'notificacion:nueva': 'notification:new',
+              'notificacion:contador': 'notification:count',
+              'presencia:actualizada': 'presence:updated',
+              'presencia:conectados': 'presence:connected',
+              'cuenta:suspendida': 'account:suspended',
+              'acceso:revocado': 'access:revoked',
+              'sala:unirse': 'room:join',
+              'sala:salir': 'room:leave',
+            } as Record<string, string>
+          )[change.event] ?? change.event;
         this.changes.set(
           `${change.event}:${change.postId ?? change.groupId ?? change.userId ?? change.room ?? ''}`,
           change,
@@ -131,116 +189,60 @@ export class RealtimeGateway implements OnModuleInit, OnModuleDestroy {
         }, 3000);
     }
   }
-  private async accept(request: IncomingMessage, socket: Duplex, head: Buffer) {
-    const reject = () => {
-      if (!socket.destroyed)
-        socket.end('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');
+  private async accept(socket: Socket) {
+    const now = Date.now();
+    for (const [key, value] of this.upgrades)
+      if (value.until <= now) this.upgrades.delete(key);
+    const address = socket.handshake.address;
+    const bucket = this.upgrades.get(address) ?? {
+      count: 0,
+      until: now + 60000,
     };
-    if (request.url !== '/tiempo-real') {
-      socket.destroy();
-      return;
-    }
-    try {
-      const origin =
-        this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3000';
-      if (
-        request.headers.origin !== new URL(origin).origin ||
-        this.connections.size >= 1000
-      ) {
-        reject();
-        return;
-      }
-      const now = Date.now(),
-        ip = request.socket.remoteAddress ?? 'unknown';
-      for (const [key, bucket] of this.upgrades)
-        if (bucket.until < now) this.upgrades.delete(key);
-      const bucket = this.upgrades.get(ip) ?? { count: 0, until: now + 60000 };
-      if (++bucket.count > 120 || this.upgrades.size > 10000) {
-        reject();
-        return;
-      }
-      this.upgrades.set(ip, bucket);
-      const token = request.headers.cookie?.match(
-        /(?:^|;\s*)jwt=([A-Za-z0-9._-]+)(?:;|$)/,
-      )?.[1];
-      if (!token) {
-        reject();
-        return;
-      }
-      const jwt = new JwtService({
-        secret: this.config.getOrThrow<string>('JWT_SECRET'),
-      });
-      const claims: unknown = await jwt.verifyAsync(token, {
-        algorithms: ['HS256'],
-        maxAge: '60m',
-      });
-      const user = await this.strategy.validate(claims);
-      const expires = (claims as { exp: number }).exp * 1000;
-      if (
-        socket.destroyed ||
-        [...this.connections.values()].filter((c) => c.user.id === user.id)
-          .length >= 12
-      ) {
-        reject();
-        return;
-      }
-      this.server.handleUpgrade(request, socket, head, (ws) => {
-        const connection: Connection = {
-          id: randomUUID(),
-          socket: ws,
-          user,
-          claims,
-          expires,
-          rooms: new Set(),
-          alive: true,
-          messages: 0,
-          since: now,
-          queue: Promise.resolve(),
-        };
-        this.connections.set(ws, connection);
-        ws.on('pong', () => {
-          connection.alive = true;
-        });
-        ws.on('message', (data) => {
-          const now = Date.now();
-          if (now - connection.since > 60000) {
-            connection.since = now;
-            connection.messages = 0;
-          }
-          if (++connection.messages > 30) {
-            ws.close(4008, 'Rate limited');
-            return;
-          }
-          connection.queue = connection.queue
-            .then(() => this.message(connection, data))
-            .catch(() => {
-              this.send(connection, 'error', { message: 'Solicitud inválida' });
-            });
-        });
-        ws.on('error', () => ws.terminate());
-        ws.on('close', () => {
-          this.connections.delete(ws);
-          void this.prisma.presenciaSala
-            .deleteMany({ where: { conexion: connection.id } })
-            .catch(() => undefined);
-        });
-        this.send(connection, 'conexion:lista', {});
-      });
-    } catch {
-      reject();
-    }
+    if (++bucket.count > 120 || this.upgrades.size >= 10000)
+      throw new Error('Connection limit');
+    this.upgrades.set(address, bucket);
+    const token = socket.handshake.headers.cookie?.match(
+      /(?:^|;\s*)jwt=([A-Za-z0-9._-]+)(?:;|$)/,
+    )?.[1];
+    if (!token || this.connections.size >= 1000)
+      throw new Error('Unauthorized');
+    const jwt = new JwtService({
+      secret: this.config.getOrThrow<string>('JWT_SECRET'),
+    });
+    const claims: unknown = await jwt.verifyAsync(token, {
+      algorithms: ['HS256'],
+      maxAge: '60m',
+    });
+    const user = await this.strategy.validate(claims);
+    if (
+      [...this.connections.values()].filter((c) => c.user.id === user.id)
+        .length >= 12
+    )
+      throw new Error('Connection limit');
+    socket.data.connection = {
+      id: randomUUID(),
+      socket,
+      user,
+      claims,
+      expires: (claims as { exp: number }).exp * 1000,
+      rooms: new Set<string>(),
+      alive: true,
+      messages: 0,
+      since: Date.now(),
+      queue: Promise.resolve(),
+    } satisfies Connection;
   }
   private async authenticate(connection: Connection) {
     if (connection.expires <= Date.now()) {
-      connection.socket.close(4001, 'Session expired');
+      connection.socket.disconnect(true);
       return false;
     }
     try {
       connection.user = await this.strategy.validate(connection.claims);
       return true;
     } catch {
-      this.send(connection, 'cuenta:suspendida', {});
-      connection.socket.close(4003, 'Access revoked');
+      this.send(connection, 'account:suspended', {});
+      connection.socket.disconnect(true);
       return false;
     }
   }
@@ -248,14 +250,14 @@ export class RealtimeGateway implements OnModuleInit, OnModuleDestroy {
     const [type, id] = room.split(':');
     try {
       const value = parsePostId(id);
-      if (type === 'publicacion') {
+      if (type === 'post') {
         await this.posts.findOne(value, connection.user);
         return true;
       }
-      if (type === 'grupo')
+      if (type === 'group')
         return (
           Boolean(
-            await this.prisma.grupoEstudio.count({
+            await this.presenceRepository.countGroups({
               where: { id_grupo: value },
             }),
           ) &&
@@ -277,24 +279,17 @@ export class RealtimeGateway implements OnModuleInit, OnModuleDestroy {
     for (const room of connection.rooms)
       if (!(await this.roomAllowed(connection, room))) {
         connection.rooms.delete(room);
-        await this.prisma.presenciaSala.deleteMany({
+        await connection.socket.leave(room);
+        await this.presenceRepository.removePresence({
           where: { conexion: connection.id, sala: room },
         });
-        this.send(connection, 'acceso:revocado', { room });
+        this.send(connection, 'access:revoked', { room });
       }
     return true;
   }
-  private async message(connection: Connection, raw: RawData) {
+  private async message(connection: Connection, value: unknown) {
     const now = Date.now();
     if (!(await this.authenticate(connection))) return;
-    const value: unknown = JSON.parse(
-      (Array.isArray(raw)
-        ? Buffer.concat(raw)
-        : Buffer.isBuffer(raw)
-          ? raw
-          : Buffer.from(raw)
-      ).toString(),
-    );
     if (!value || typeof value !== 'object') return;
     const { event, data } = value as {
       event: unknown;
@@ -302,28 +297,30 @@ export class RealtimeGateway implements OnModuleInit, OnModuleDestroy {
     };
     if (
       !data ||
-      !['publicacion', 'grupo'].includes(String(data.type)) ||
+      !['post', 'group'].includes(String(data.type)) ||
       typeof data.id !== 'string'
     )
       return;
     const room = `${String(data.type)}:${parsePostId(data.id)}`;
-    if (event === 'sala:salir') {
+    if (event === 'room:leave') {
       connection.rooms.delete(room);
-      await this.prisma.presenciaSala.deleteMany({
+      await connection.socket.leave(room);
+      await this.presenceRepository.removePresence({
         where: { conexion: connection.id, sala: room },
       });
       return;
     }
     if (
-      event !== 'sala:unirse' ||
+      event !== 'room:join' ||
       connection.rooms.size >= 8 ||
       !(await this.roomAllowed(connection, room))
     ) {
-      this.send(connection, 'acceso:revocado', { room });
+      this.send(connection, 'access:revoked', { room });
       return;
     }
     connection.rooms.add(room);
-    await this.prisma.presenciaSala.upsert({
+    await connection.socket.join(room);
+    await this.presenceRepository.joinPresence({
       where: { conexion_sala: { conexion: connection.id, sala: room } },
       create: {
         conexion: connection.id,
@@ -333,16 +330,11 @@ export class RealtimeGateway implements OnModuleInit, OnModuleDestroy {
       },
       update: { vence: new Date(now + 30000) },
     });
-    this.send(connection, 'sala:unirse', { room });
+    this.send(connection, 'room:join', { room });
     await this.presence(room);
   }
   private send(connection: Connection, event: string, data: unknown) {
-    if (connection.socket.readyState !== WebSocket.OPEN) return;
-    if (connection.socket.bufferedAmount > 65536) {
-      connection.socket.close(1013, 'Slow connection');
-      return;
-    }
-    connection.socket.send(JSON.stringify({ event, data }));
+    if (connection.socket.connected) connection.socket.emit(event, data);
   }
   private async flush() {
     const changes = [...this.changes.values()];
@@ -352,27 +344,30 @@ export class RealtimeGateway implements OnModuleInit, OnModuleDestroy {
         if (!(await this.revalidate(connection))) continue;
         for (const change of changes) {
           if (
-            change.event === 'acceso:actualizado' &&
+            change.event === 'access:updated' &&
             change.userId === connection.user.id.toString()
           )
-            this.send(connection, 'acceso:actualizado', { reload: true });
+            this.send(connection, 'access:updated', { reload: true });
           if (
-            change.event.startsWith('notificacion:') &&
+            change.event.startsWith('notification:') &&
             change.userId === connection.user.id.toString()
-          )
+          ) {
             this.send(connection, change.event, { reload: true });
+            if (change.event === 'notification:new')
+              this.send(connection, 'notification:count', { reload: true });
+          }
           const rooms = [
-            change.postId ? `publicacion:${change.postId}` : '',
-            change.groupId ? `grupo:${change.groupId}` : '',
+            change.postId ? `post:${change.postId}` : '',
+            change.groupId ? `group:${change.groupId}` : '',
           ].filter((room) => connection.rooms.has(room));
           for (const room of rooms) {
             if (
               [
-                'publicacion:nueva',
-                'publicacion:actualizada',
-                'comentario:nuevo',
-                'comentario:retirado',
-                'acceso:actualizado',
+                'post:new',
+                'post:updated',
+                'comment:new',
+                'comment:removed',
+                'access:updated',
               ].includes(change.event)
             )
               this.send(connection, change.event, { room, reload: true });
@@ -381,7 +376,7 @@ export class RealtimeGateway implements OnModuleInit, OnModuleDestroy {
       }
       for (const room of new Set(
         changes
-          .filter((c) => c.event === 'presencia:actualizada')
+          .filter((c) => c.event === 'presence:updated')
           .map((c) => c.room!),
       ))
         await this.presence(room);
@@ -392,7 +387,7 @@ export class RealtimeGateway implements OnModuleInit, OnModuleDestroy {
     }
   }
   private async presence(room: string) {
-    const rows = await this.prisma.presenciaSala.findMany({
+    const rows = await this.presenceRepository.findPresence({
       where: { sala: room, vence: { gt: new Date() } },
       select: { id_usuario: true },
       distinct: ['id_usuario'],
@@ -403,7 +398,7 @@ export class RealtimeGateway implements OnModuleInit, OnModuleDestroy {
         (await this.revalidate(connection)) &&
         connection.rooms.has(room)
       )
-        this.send(connection, 'presencia:conectados', {
+        this.send(connection, 'presence:connected', {
           room,
           count: rows.length,
         });
@@ -413,19 +408,13 @@ export class RealtimeGateway implements OnModuleInit, OnModuleDestroy {
     this.ticking = true;
     try {
       for (const connection of this.connections.values()) {
-        if (!connection.alive) {
-          connection.socket.terminate();
-          continue;
-        }
-        connection.alive = false;
-        connection.socket.ping();
         if (!(await this.revalidate(connection))) continue;
-        await this.prisma.presenciaSala.updateMany({
+        await this.presenceRepository.refreshPresence({
           where: { conexion: connection.id },
           data: { vence: new Date(Date.now() + 30000) },
         });
       }
-      await this.prisma.presenciaSala.deleteMany({
+      await this.presenceRepository.removePresence({
         where: { vence: { lte: new Date() } },
       });
       for (const room of new Set(
@@ -434,22 +423,22 @@ export class RealtimeGateway implements OnModuleInit, OnModuleDestroy {
         await this.presence(room);
     } catch {
       for (const connection of this.connections.values())
-        connection.socket.close(1012, 'Reconnecting');
+        connection.socket.disconnect(true);
     } finally {
       this.ticking = false;
     }
   }
   async onModuleDestroy() {
     this.stopped = true;
-    this.http?.off('upgrade', this.upgrade);
+
     if (this.heartbeat) clearInterval(this.heartbeat);
     if (this.reconnect) clearTimeout(this.reconnect);
     if (this.flushTimer) clearTimeout(this.flushTimer);
     const ids = [...this.connections.values()].map((c) => c.id);
     for (const connection of this.connections.values())
-      connection.socket.terminate();
-    await this.prisma.presenciaSala
-      .deleteMany({ where: { conexion: { in: ids } } })
+      connection.socket.disconnect(true);
+    await this.presenceRepository
+      .removePresence({ where: { conexion: { in: ids } } })
       .catch(() => undefined);
     await this.listener?.end().catch(() => undefined);
     this.server.close();

@@ -148,7 +148,9 @@ export class AttachmentsService {
     work: (repository: AttachmentsRepository) => Promise<T>,
   ) {
     return this.repository.withPostLock(postId, async (repository, posts) => {
-      await new PostsService(posts).requireAuthor(postId, user);
+      await this.posts.withRepository(posts, () =>
+        this.posts.requireAuthor(postId, user),
+      );
       return work(repository);
     });
   }

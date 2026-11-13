@@ -27,7 +27,7 @@ const inputId = {
 const page = (name) =>
   object({ items: array(ref(name)), nextCursor: nullable(str) });
 const role = enumeration('member', 'moderator', 'administrator');
-const state = enumeration('visible', 'retenido', 'eliminado');
+const state = enumeration('visible', 'retained', 'deleted');
 const reportState = enumeration(
   'pendiente',
   'desestimado',
@@ -266,21 +266,21 @@ const schemas = {
     groups: integer,
   }),
   AdminUser: object({
-    id_usuario: id,
-    nombre: str,
-    apellido: str,
-    rol: enumeration('usuario', 'administrador'),
-    estado: enumeration('activo', 'suspendido'),
-    suspendido_hasta: nullable(date),
+    id: id,
+    firstName: str,
+    lastName: str,
+    role: enumeration('user', 'administrator'),
+    status: enumeration('active', 'suspended'),
+    suspendedUntil: nullable(date),
   }),
   AdminUserPage: page('AdminUser'),
   AdminPost: object({
-    id_publicacion: id,
-    titulo: str,
-    estado: state,
+    postId: id,
+    title: str,
+    status: state,
     version: positive,
-    id_grupo: nullable(id),
-    id_autor: id,
+    groupId: nullable(id),
+    authorId: id,
   }),
   AdminPostPage: page('AdminPost'),
   Suspension: object({
@@ -291,9 +291,9 @@ const schemas = {
     statusCode: { type: 'integer', minimum: 400, maximum: 599 },
     error: str,
     message: { oneOf: [str, array(str)] },
-    idCorrelacion: { ...str, format: 'uuid' },
-    ruta: str,
-    fecha: date,
+    correlationId: { ...str, format: 'uuid' },
+    path: str,
+    timestamp: date,
   }),
 };
 const query = (name, schema = str) => ({

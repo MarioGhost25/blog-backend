@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import {
   BadRequestException,
   ConflictException,
@@ -23,7 +24,14 @@ import {
 
 @Injectable()
 export class PostsService {
-  constructor(private readonly repository: PostsRepository) {}
+  private readonly scope = new AsyncLocalStorage<PostsRepository>();
+  constructor(private readonly defaultRepository: PostsRepository) {}
+  private get repository() {
+    return this.scope.getStore() ?? this.defaultRepository;
+  }
+  withRepository<T>(repository: PostsRepository, work: () => T): T {
+    return this.scope.run(repository, work);
+  }
 
   getOperation(user: AuthenticatedUser, key: string, owner?: string) {
     const operation = identifyOperation(
@@ -54,15 +62,18 @@ export class PostsService {
       dto ?? {},
     );
     return this.repository.executeOperation(operation, async (repository) => {
-      const service = new PostsService(repository);
       if (method === 'POST') {
         const input = dto as CreatePostDto;
-        return service.create(user, input);
+        return this.withRepository(repository, () => this.create(user, input));
       }
-      await service.requireAuthor(postId!, user);
+      await this.withRepository(repository, () =>
+        this.requireAuthor(postId!, user),
+      );
       if (method === 'PATCH')
-        return service.update(postId!, user, dto as UpdatePostDto);
-      await service.remove(postId!, user);
+        return this.withRepository(repository, () =>
+          this.update(postId!, user, dto as UpdatePostDto),
+        );
+      await this.withRepository(repository, () => this.remove(postId!, user));
       const deleted = await repository.findById(postId!);
       return { id: postId!, version: deleted!.version };
     });
@@ -73,7 +84,9 @@ export class PostsService {
     const groupId = dto.groupId == null ? null : parsePostId(dto.groupId);
     const text = this.cleanText(dto.title, dto.content);
     return this.repository.withGroupLock(groupId, async (repository) => {
-      await new PostsService(repository).ensureCategory(categoryId);
+      await this.withRepository(repository, () =>
+        this.ensureCategory(categoryId),
+      );
       if (
         groupId !== null &&
         !(await repository.findGroupMembership(groupId, user.id))
@@ -154,9 +167,12 @@ export class PostsService {
     return this.repository.withPostLock(
       postId,
       async (repository) => {
-        const service = new PostsService(repository);
-        const post = await service.requirePost(postId);
-        const role = await service.roleFor(post, user);
+        const post = await this.withRepository(repository, () =>
+          this.requirePost(postId),
+        );
+        const role = await this.withRepository(repository, () =>
+          this.roleFor(post, user),
+        );
         assertCanReadPost(post, user, role);
         return {
           ...post,
@@ -177,11 +193,15 @@ export class PostsService {
 
   async update(postId: bigint, user: AuthenticatedUser, dto: UpdatePostDto) {
     return this.repository.withPostLock(postId, async (repository) => {
-      const service = new PostsService(repository);
-      const post = await service.requireAuthor(postId, user);
+      const post = await this.withRepository(repository, () =>
+        this.requireAuthor(postId, user),
+      );
       const categoryId =
         dto.categoryId == null ? undefined : parsePostId(dto.categoryId);
-      if (categoryId !== undefined) await service.ensureCategory(categoryId);
+      if (categoryId !== undefined)
+        await this.withRepository(repository, () =>
+          this.ensureCategory(categoryId),
+        );
       const text = this.cleanText(
         dto.title ?? post.title,
         dto.content ?? post.content,
@@ -195,15 +215,20 @@ export class PostsService {
         throw new ConflictException(
           'Version conflict: the post was modified by another session',
         );
-      return service.requirePost(postId);
+      return this.withRepository(repository, () => this.requirePost(postId));
     });
   }
 
   async remove(postId: bigint, user: AuthenticatedUser, observation?: string) {
     await this.repository.withPostLock(postId, async (repository) => {
-      const service = new PostsService(repository);
-      const post = await service.requirePost(postId);
-      assertCanDeletePost(post, user, await service.roleFor(post, user));
+      const post = await this.withRepository(repository, () =>
+        this.requirePost(postId),
+      );
+      assertCanDeletePost(
+        post,
+        user,
+        await this.withRepository(repository, () => this.roleFor(post, user)),
+      );
       if (post.authorId !== user.id && !observation)
         throw new BadRequestException('An observation is required');
       await repository.changeStatus(postId, 'deleted');

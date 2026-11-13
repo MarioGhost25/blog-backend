@@ -108,9 +108,9 @@ export class ApiExceptionFilter implements ExceptionFilter {
       statusCode: status,
       error: code,
       message,
-      idCorrelacion: requestId,
-      ruta: routePattern(request),
-      fecha: new Date().toISOString(),
+      correlationId: requestId,
+      path: routePattern(request),
+      timestamp: new Date().toISOString(),
     });
   }
 }

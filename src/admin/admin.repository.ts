@@ -1,10 +1,5 @@
-import { suspendAccount } from '../auth/account-suspension';
 import type { EstadoUsuario, RolGlobal, EstadoContenido } from '@prisma/client';
-import {
-  ForbiddenException,
-  BadRequestException,
-  Injectable,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 @Injectable()
 export class AdminRepository {
@@ -58,32 +53,33 @@ export class AdminRepository {
       },
     });
     return {
-      items: rows.slice(0, 20),
+      items: rows.slice(0, 20).map((row) => ({
+        id: row.id_usuario,
+        firstName: row.nombre,
+        lastName: row.apellido,
+        role: row.rol === 'administrador' ? 'administrator' : 'user',
+        status: row.estado === 'activo' ? 'active' : 'suspended',
+        suspendedUntil: row.suspendido_hasta,
+      })),
       nextCursor: rows.length > 20 ? String(rows[19].id_usuario) : null,
     };
   }
-  async suspension(id: bigint, actor: bigint, days?: number, reason?: string) {
+  async updateSuspension(
+    id: bigint,
+    actor: bigint,
+    data: import('@prisma/client').Prisma.UsuarioUncheckedUpdateInput,
+    authorize: (
+      current: { rol: RolGlobal; estado: EstadoUsuario } | null,
+    ) => void,
+  ) {
     return this.db.$transaction(async (tx) => {
-      if (days !== undefined)
-        return suspendAccount(tx, id, actor, days, reason!);
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(61110001)::text`;
       const current = await tx.usuario.findUnique({
         where: { id_usuario: actor },
         select: { rol: true, estado: true },
       });
-      if (current?.rol !== 'administrador' || current.estado !== 'activo')
-        throw new ForbiddenException();
-      if (id === actor)
-        throw new BadRequestException('Cannot reactivate yourself');
-      await tx.usuario.update({
-        where: { id_usuario: id },
-        data: {
-          estado: 'activo',
-          suspendido_hasta: null,
-          suspendido_por: null,
-          motivo_suspension: null,
-        },
-      });
+      authorize(current);
+      await tx.usuario.update({ where: { id_usuario: id }, data });
     });
   }
   async posts(
@@ -117,7 +113,20 @@ export class AdminRepository {
       },
     });
     return {
-      items: rows.slice(0, 20),
+      items: rows.slice(0, 20).map((row) => ({
+        postId: row.id_publicacion,
+        title: row.titulo,
+        status: (
+          {
+            visible: 'visible',
+            retenido: 'retained',
+            eliminado: 'deleted',
+          } as const
+        )[row.estado],
+        version: row.version,
+        groupId: row.id_grupo,
+        authorId: row.id_autor,
+      })),
       nextCursor: rows.length > 20 ? String(rows[19].id_publicacion) : null,
     };
   }

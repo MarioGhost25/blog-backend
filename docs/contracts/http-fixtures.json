@@ -266,9 +266,9 @@
         "statusCode": 403,
         "error": "Forbidden",
         "message": "Only the author can modify this post",
-        "idCorrelacion": "4c37d187-ce00-4d6c-97b6-d1a745c5433d",
-        "ruta": "/api/v1/posts/:id",
-        "fecha": "2026-11-11T02:29:29.690Z"
+        "correlationId": "4c37d187-ce00-4d6c-97b6-d1a745c5433d",
+        "path": "/api/v1/posts/:id",
+        "timestamp": "2026-11-11T02:29:29.690Z"
       }
     },
     {
@@ -279,9 +279,9 @@
         "statusCode": 403,
         "error": "Forbidden",
         "message": "Only the author can modify this post",
-        "idCorrelacion": "b8a9777b-1bfb-4dc8-ad9c-e351818f378b",
-        "ruta": "/api/v1/posts/:id/attachments/order",
-        "fecha": "2026-11-11T02:29:29.709Z"
+        "correlationId": "b8a9777b-1bfb-4dc8-ad9c-e351818f378b",
+        "path": "/api/v1/posts/:id/attachments/order",
+        "timestamp": "2026-11-11T02:29:29.709Z"
       }
     },
     {
@@ -292,9 +292,9 @@
         "statusCode": 403,
         "error": "Forbidden",
         "message": "Only the author can modify this post",
-        "idCorrelacion": "68ff2dc8-7bdc-4f25-8d94-ccf51e8ef561",
-        "ruta": "/api/v1/posts/:id/attachments/:attachmentId",
-        "fecha": "2026-11-11T02:29:29.731Z"
+        "correlationId": "68ff2dc8-7bdc-4f25-8d94-ccf51e8ef561",
+        "path": "/api/v1/posts/:id/attachments/:attachmentId",
+        "timestamp": "2026-11-11T02:29:29.731Z"
       }
     },
     {
@@ -305,9 +305,9 @@
         "statusCode": 403,
         "error": "Forbidden",
         "message": "Only the author can modify this post",
-        "idCorrelacion": "7eceaccc-be39-4429-b9b5-0685da6fb6b8",
-        "ruta": "/api/v1/posts/:id/attachments",
-        "fecha": "2026-11-11T02:29:29.751Z"
+        "correlationId": "7eceaccc-be39-4429-b9b5-0685da6fb6b8",
+        "path": "/api/v1/posts/:id/attachments",
+        "timestamp": "2026-11-11T02:29:29.751Z"
       }
     },
     {
@@ -434,9 +434,9 @@
         "statusCode": 403,
         "error": "Forbidden",
         "message": "Your membership in this group does not grant the required role",
-        "idCorrelacion": "ae095c78-787a-4333-a3ed-dab3a20d18d7",
-        "ruta": "/api/v1/groups/:id/members/:userId",
-        "fecha": "2026-11-11T02:29:30.012Z"
+        "correlationId": "ae095c78-787a-4333-a3ed-dab3a20d18d7",
+        "path": "/api/v1/groups/:id/members/:userId",
+        "timestamp": "2026-11-11T02:29:30.012Z"
       }
     },
     {
@@ -447,9 +447,9 @@
         "statusCode": 403,
         "error": "Forbidden",
         "message": "Your membership in this group does not grant the required role",
-        "idCorrelacion": "2a637951-ca61-41aa-9e0e-83032cd97d63",
-        "ruta": "/api/v1/groups/:id/members/:userId",
-        "fecha": "2026-11-11T02:29:30.018Z"
+        "correlationId": "2a637951-ca61-41aa-9e0e-83032cd97d63",
+        "path": "/api/v1/groups/:id/members/:userId",
+        "timestamp": "2026-11-11T02:29:30.018Z"
       }
     },
     {
@@ -460,9 +460,9 @@
         "statusCode": 403,
         "error": "Forbidden",
         "message": "You cannot view this retained post",
-        "idCorrelacion": "d0f31d06-ee44-4f45-8a88-73b03700bae7",
-        "ruta": "/api/v1/posts/:id",
-        "fecha": "2026-11-11T02:29:30.109Z"
+        "correlationId": "d0f31d06-ee44-4f45-8a88-73b03700bae7",
+        "path": "/api/v1/posts/:id",
+        "timestamp": "2026-11-11T02:29:30.109Z"
       }
     },
     {
@@ -473,9 +473,9 @@
         "statusCode": 403,
         "error": "Forbidden",
         "message": "You cannot delete this post",
-        "idCorrelacion": "8b57131e-7542-4c77-8983-a43c111d1aca",
-        "ruta": "/api/v1/posts/:id",
-        "fecha": "2026-11-11T02:29:30.194Z"
+        "correlationId": "8b57131e-7542-4c77-8983-a43c111d1aca",
+        "path": "/api/v1/posts/:id",
+        "timestamp": "2026-11-11T02:29:30.194Z"
       }
     },
     {
@@ -486,9 +486,9 @@
         "statusCode": 403,
         "error": "Forbidden",
         "message": "Your membership in this group does not grant the required role",
-        "idCorrelacion": "987769e5-3595-40ac-8fb7-20111ec12d96",
-        "ruta": "/api/v1/groups/:id/members",
-        "fecha": "2026-11-11T02:29:30.407Z"
+        "correlationId": "987769e5-3595-40ac-8fb7-20111ec12d96",
+        "path": "/api/v1/groups/:id/members",
+        "timestamp": "2026-11-11T02:29:30.407Z"
       }
     },
     {
@@ -499,9 +499,9 @@
         "statusCode": 403,
         "error": "Forbidden",
         "message": "Group membership is required",
-        "idCorrelacion": "3146a45e-7231-4392-9576-262d98e9663d",
-        "ruta": "/api/v1/posts/group/:groupId",
-        "fecha": "2026-11-11T02:29:30.414Z"
+        "correlationId": "3146a45e-7231-4392-9576-262d98e9663d",
+        "path": "/api/v1/posts/group/:groupId",
+        "timestamp": "2026-11-11T02:29:30.414Z"
       }
     },
     {
@@ -512,9 +512,9 @@
         "statusCode": 403,
         "error": "Forbidden",
         "message": "Group membership is required",
-        "idCorrelacion": "81d01a9e-8ea1-4c39-b811-4402e3653d08",
-        "ruta": "/api/v1/posts",
-        "fecha": "2026-11-11T02:29:30.443Z"
+        "correlationId": "81d01a9e-8ea1-4c39-b811-4402e3653d08",
+        "path": "/api/v1/posts",
+        "timestamp": "2026-11-11T02:29:30.443Z"
       }
     },
     {
@@ -647,9 +647,9 @@
         "statusCode": 401,
         "error": "Unauthorized",
         "message": "Unauthorized",
-        "idCorrelacion": "5ed57684-3720-4b5b-b79c-a9586a25a26f",
-        "ruta": "/api/v1/groups",
-        "fecha": "2026-11-11T02:29:31.100Z"
+        "correlationId": "5ed57684-3720-4b5b-b79c-a9586a25a26f",
+        "path": "/api/v1/groups",
+        "timestamp": "2026-11-11T02:29:31.100Z"
       }
     },
     {
@@ -660,9 +660,9 @@
         "statusCode": 401,
         "error": "Unauthorized",
         "message": "Unauthorized",
-        "idCorrelacion": "42954a3e-61cf-4b70-91a3-394844c0c03a",
-        "ruta": "/api/v1/groups/:id/members",
-        "fecha": "2026-11-11T02:29:31.102Z"
+        "correlationId": "42954a3e-61cf-4b70-91a3-394844c0c03a",
+        "path": "/api/v1/groups/:id/members",
+        "timestamp": "2026-11-11T02:29:31.102Z"
       }
     },
     {
@@ -673,9 +673,9 @@
         "statusCode": 401,
         "error": "Unauthorized",
         "message": "Unauthorized",
-        "idCorrelacion": "ce223b55-ad53-4f36-85c5-751c2bc69313",
-        "ruta": "/api/v1/posts/group/:groupId",
-        "fecha": "2026-11-11T02:29:31.104Z"
+        "correlationId": "ce223b55-ad53-4f36-85c5-751c2bc69313",
+        "path": "/api/v1/posts/group/:groupId",
+        "timestamp": "2026-11-11T02:29:31.104Z"
       }
     },
     {
@@ -800,9 +800,9 @@
         "statusCode": 404,
         "error": "NotFound",
         "message": "Attachment not found",
-        "idCorrelacion": "70ba13ab-a036-4659-9819-610010027675",
-        "ruta": "/api/v1/posts/:id/attachments/:attachmentId",
-        "fecha": "2026-11-11T02:29:31.588Z"
+        "correlationId": "70ba13ab-a036-4659-9819-610010027675",
+        "path": "/api/v1/posts/:id/attachments/:attachmentId",
+        "timestamp": "2026-11-11T02:29:31.588Z"
       }
     },
     {
@@ -813,9 +813,9 @@
         "statusCode": 409,
         "error": "Conflict",
         "message": "You are already a member of this group",
-        "idCorrelacion": "f71d9d1c-a62c-44a2-937c-40e7fa578cfb",
-        "ruta": "/api/v1/groups/:id/members",
-        "fecha": "2026-11-11T02:29:31.633Z"
+        "correlationId": "f71d9d1c-a62c-44a2-937c-40e7fa578cfb",
+        "path": "/api/v1/groups/:id/members",
+        "timestamp": "2026-11-11T02:29:31.633Z"
       }
     },
     {
@@ -826,9 +826,9 @@
         "statusCode": 409,
         "error": "Conflict",
         "message": "You are the only administrator; transfer administration before leaving",
-        "idCorrelacion": "43a605ff-5e7c-461c-9f15-51fce31e022f",
-        "ruta": "/api/v1/groups/:id/members/me",
-        "fecha": "2026-11-11T02:29:31.676Z"
+        "correlationId": "43a605ff-5e7c-461c-9f15-51fce31e022f",
+        "path": "/api/v1/groups/:id/members/me",
+        "timestamp": "2026-11-11T02:29:31.676Z"
       }
     },
     {
@@ -839,9 +839,9 @@
         "statusCode": 409,
         "error": "Conflict",
         "message": "The group must have at least one administrator",
-        "idCorrelacion": "0c8ae334-5aa8-4e55-82b3-f7dac0c59d13",
-        "ruta": "/api/v1/groups/:id/members/:userId",
-        "fecha": "2026-11-11T02:29:31.721Z"
+        "correlationId": "0c8ae334-5aa8-4e55-82b3-f7dac0c59d13",
+        "path": "/api/v1/groups/:id/members/:userId",
+        "timestamp": "2026-11-11T02:29:31.721Z"
       }
     },
     {
@@ -858,9 +858,9 @@
         "statusCode": 403,
         "error": "Forbidden",
         "message": "Your membership in this group does not grant the required role",
-        "idCorrelacion": "c6886df2-0f74-4d06-803b-909eccf5789e",
-        "ruta": "/api/v1/groups/:id/transfer",
-        "fecha": "2026-11-11T02:29:31.888Z"
+        "correlationId": "c6886df2-0f74-4d06-803b-909eccf5789e",
+        "path": "/api/v1/groups/:id/transfer",
+        "timestamp": "2026-11-11T02:29:31.888Z"
       }
     },
     {
@@ -871,9 +871,9 @@
         "statusCode": 400,
         "error": "ValidationError",
         "message": "You cannot transfer administration to yourself",
-        "idCorrelacion": "25034637-7823-43c8-a094-5c9fc2faeaf9",
-        "ruta": "/api/v1/groups/:id/transfer",
-        "fecha": "2026-11-11T02:29:31.902Z"
+        "correlationId": "25034637-7823-43c8-a094-5c9fc2faeaf9",
+        "path": "/api/v1/groups/:id/transfer",
+        "timestamp": "2026-11-11T02:29:31.902Z"
       }
     },
     {
@@ -884,9 +884,9 @@
         "statusCode": 403,
         "error": "Forbidden",
         "message": "Group membership is required",
-        "idCorrelacion": "6509fa5f-f0da-4823-a9b2-7c2f4bdf90d5",
-        "ruta": "/api/v1/posts/:id/attachments/:attachmentId/content",
-        "fecha": "2026-11-11T02:29:32.885Z"
+        "correlationId": "6509fa5f-f0da-4823-a9b2-7c2f4bdf90d5",
+        "path": "/api/v1/posts/:id/attachments/:attachmentId/content",
+        "timestamp": "2026-11-11T02:29:32.885Z"
       }
     },
     {
@@ -897,9 +897,9 @@
         "statusCode": 404,
         "error": "NotFound",
         "message": "Post not found",
-        "idCorrelacion": "38e46d05-3180-4278-a1d6-9d316e964aa2",
-        "ruta": "/api/v1/posts/:id/attachments/:attachmentId/content",
-        "fecha": "2026-11-11T02:29:32.976Z"
+        "correlationId": "38e46d05-3180-4278-a1d6-9d316e964aa2",
+        "path": "/api/v1/posts/:id/attachments/:attachmentId/content",
+        "timestamp": "2026-11-11T02:29:32.976Z"
       }
     },
     {
@@ -910,9 +910,9 @@
         "statusCode": 410,
         "error": "Gone",
         "message": "This legacy resource requires a private storage migration",
-        "idCorrelacion": "3f08ca3f-e0a0-4bb3-82e4-2e261049e949",
-        "ruta": "/api/v1/posts/:id/attachments/:attachmentId/content",
-        "fecha": "2026-11-11T02:29:33.104Z"
+        "correlationId": "3f08ca3f-e0a0-4bb3-82e4-2e261049e949",
+        "path": "/api/v1/posts/:id/attachments/:attachmentId/content",
+        "timestamp": "2026-11-11T02:29:33.104Z"
       }
     },
     {
@@ -923,9 +923,9 @@
         "statusCode": 415,
         "error": "UnsupportedMediaType",
         "message": "Invalid, damaged or unsupported file",
-        "idCorrelacion": "d0d92df2-3d6b-41a3-8433-7963c11b8257",
-        "ruta": "/api/v1/posts/:id/attachments",
-        "fecha": "2026-11-11T02:29:33.139Z"
+        "correlationId": "d0d92df2-3d6b-41a3-8433-7963c11b8257",
+        "path": "/api/v1/posts/:id/attachments",
+        "timestamp": "2026-11-11T02:29:33.139Z"
       }
     },
     {
@@ -1035,9 +1035,9 @@
         "statusCode": 400,
         "error": "ValidationError",
         "message": "The parent must be a visible comment in the same publication",
-        "idCorrelacion": "dd934fec-689d-416b-a80e-97249a5a7057",
-        "ruta": "/api/v1/posts/:id/comments",
-        "fecha": "2026-11-11T02:29:33.596Z"
+        "correlationId": "dd934fec-689d-416b-a80e-97249a5a7057",
+        "path": "/api/v1/posts/:id/comments",
+        "timestamp": "2026-11-11T02:29:33.596Z"
       }
     },
     {
@@ -1048,9 +1048,9 @@
         "statusCode": 403,
         "error": "Forbidden",
         "message": "Group membership is required",
-        "idCorrelacion": "aedb3c2a-6cb6-4751-8a87-8435b02749d4",
-        "ruta": "/api/v1/posts/:id/comments",
-        "fecha": "2026-11-11T02:29:33.608Z"
+        "correlationId": "aedb3c2a-6cb6-4751-8a87-8435b02749d4",
+        "path": "/api/v1/posts/:id/comments",
+        "timestamp": "2026-11-11T02:29:33.608Z"
       }
     },
     {
@@ -1079,9 +1079,9 @@
         "statusCode": 403,
         "error": "Forbidden",
         "message": "Forbidden",
-        "idCorrelacion": "9875cc4f-f75f-4dac-8737-3dd2637b4353",
-        "ruta": "/api/v1/moderation/retained/:type/:id",
-        "fecha": "2026-11-11T02:29:33.736Z"
+        "correlationId": "9875cc4f-f75f-4dac-8737-3dd2637b4353",
+        "path": "/api/v1/moderation/retained/:type/:id",
+        "timestamp": "2026-11-11T02:29:33.736Z"
       }
     },
     {
@@ -1098,9 +1098,9 @@
         "statusCode": 409,
         "error": "Conflict",
         "message": "Content changed since review",
-        "idCorrelacion": "c0488b09-9297-4409-b7f1-39d1d25bc47c",
-        "ruta": "/api/v1/moderation/retained/:type/:id",
-        "fecha": "2026-11-11T02:29:33.763Z"
+        "correlationId": "c0488b09-9297-4409-b7f1-39d1d25bc47c",
+        "path": "/api/v1/moderation/retained/:type/:id",
+        "timestamp": "2026-11-11T02:29:33.763Z"
       }
     },
     {
@@ -1111,9 +1111,9 @@
         "statusCode": 500,
         "error": "InternalError",
         "message": "An internal error occurred",
-        "idCorrelacion": "d920e6dc-01c4-4023-9233-c880c453741f",
-        "ruta": "/api/v1/posts/:id/comments",
-        "fecha": "2026-11-11T02:29:33.899Z"
+        "correlationId": "d920e6dc-01c4-4023-9233-c880c453741f",
+        "path": "/api/v1/posts/:id/comments",
+        "timestamp": "2026-11-11T02:29:33.899Z"
       }
     },
     {
@@ -1124,9 +1124,9 @@
         "statusCode": 400,
         "error": "ValidationError",
         "message": "An observation is required to remove another author content",
-        "idCorrelacion": "8d9cb7b9-2a83-49bd-9faf-34c00f48efd6",
-        "ruta": "/api/v1/comments/:id",
-        "fecha": "2026-11-11T02:29:33.964Z"
+        "correlationId": "8d9cb7b9-2a83-49bd-9faf-34c00f48efd6",
+        "path": "/api/v1/comments/:id",
+        "timestamp": "2026-11-11T02:29:33.964Z"
       }
     },
     {
@@ -1137,9 +1137,9 @@
         "statusCode": 403,
         "error": "Forbidden",
         "message": "Group membership is required",
-        "idCorrelacion": "55358b6a-103c-460c-9361-aa19a2673839",
-        "ruta": "/api/v1/comments/:id",
-        "fecha": "2026-11-11T02:29:33.978Z"
+        "correlationId": "55358b6a-103c-460c-9361-aa19a2673839",
+        "path": "/api/v1/comments/:id",
+        "timestamp": "2026-11-11T02:29:33.978Z"
       }
     },
     {
@@ -1150,9 +1150,9 @@
         "statusCode": 409,
         "error": "Conflict",
         "message": "Already reported",
-        "idCorrelacion": "f26fee37-8600-49e4-9931-cd6f3c500055",
-        "ruta": "/api/v1/reports",
-        "fecha": "2026-11-11T02:29:34.062Z"
+        "correlationId": "f26fee37-8600-49e4-9931-cd6f3c500055",
+        "path": "/api/v1/reports",
+        "timestamp": "2026-11-11T02:29:34.062Z"
       }
     },
     {
@@ -1182,9 +1182,9 @@
         "statusCode": 403,
         "error": "Forbidden",
         "message": "Forbidden",
-        "idCorrelacion": "48564f2f-3c91-408b-a60a-4b1dbc750434",
-        "ruta": "/api/v1/reports",
-        "fecha": "2026-11-11T02:29:34.089Z"
+        "correlationId": "48564f2f-3c91-408b-a60a-4b1dbc750434",
+        "path": "/api/v1/reports",
+        "timestamp": "2026-11-11T02:29:34.089Z"
       }
     },
     {
@@ -1204,9 +1204,9 @@
         "statusCode": 403,
         "error": "Forbidden",
         "message": "Forbidden",
-        "idCorrelacion": "40808ba2-e8f5-48ce-9adc-9044bbd2c9fb",
-        "ruta": "/api/v1/moderation/reports/:id",
-        "fecha": "2026-11-11T02:29:34.118Z"
+        "correlationId": "40808ba2-e8f5-48ce-9adc-9044bbd2c9fb",
+        "path": "/api/v1/moderation/reports/:id",
+        "timestamp": "2026-11-11T02:29:34.118Z"
       }
     },
     {
@@ -1223,9 +1223,9 @@
         "statusCode": 409,
         "error": "Conflict",
         "message": "Report already resolved",
-        "idCorrelacion": "12d68d3a-8d7a-4ffa-9db0-d84108213c01",
-        "ruta": "/api/v1/moderation/reports/:id",
-        "fecha": "2026-11-11T02:29:34.147Z"
+        "correlationId": "12d68d3a-8d7a-4ffa-9db0-d84108213c01",
+        "path": "/api/v1/moderation/reports/:id",
+        "timestamp": "2026-11-11T02:29:34.147Z"
       }
     },
     {
@@ -1236,9 +1236,9 @@
         "statusCode": 400,
         "error": "ValidationError",
         "message": "Suspension requires another account, 1–90 days and a reason of 5–500 characters",
-        "idCorrelacion": "645f80d5-8409-46ef-ad59-c350c41a8176",
-        "ruta": "/api/v1/moderation/reports/:id",
-        "fecha": "2026-11-11T02:29:34.250Z"
+        "correlationId": "645f80d5-8409-46ef-ad59-c350c41a8176",
+        "path": "/api/v1/moderation/reports/:id",
+        "timestamp": "2026-11-11T02:29:34.250Z"
       }
     },
     {
@@ -1249,9 +1249,9 @@
         "statusCode": 429,
         "error": "RateLimited",
         "message": "Report limit reached",
-        "idCorrelacion": "cdaaab12-bb72-4a6f-83c1-64a06c57bfaa",
-        "ruta": "/api/v1/reports",
-        "fecha": "2026-11-11T02:29:34.349Z"
+        "correlationId": "cdaaab12-bb72-4a6f-83c1-64a06c57bfaa",
+        "path": "/api/v1/reports",
+        "timestamp": "2026-11-11T02:29:34.349Z"
       }
     },
     {
@@ -1262,9 +1262,9 @@
         "statusCode": 403,
         "error": "Forbidden",
         "message": "Forbidden",
-        "idCorrelacion": "a84083de-866e-418d-a4e9-4187c296c2cc",
-        "ruta": "/api/v1/admin/summary",
-        "fecha": "2026-11-11T02:29:34.387Z"
+        "correlationId": "a84083de-866e-418d-a4e9-4187c296c2cc",
+        "path": "/api/v1/admin/summary",
+        "timestamp": "2026-11-11T02:29:34.387Z"
       }
     },
     {
@@ -1275,9 +1275,9 @@
         "statusCode": 403,
         "error": "Forbidden",
         "message": "Forbidden",
-        "idCorrelacion": "4605670b-715c-48cc-8c2a-827a5a70cc36",
-        "ruta": "/api/v1/admin/users",
-        "fecha": "2026-11-11T02:29:34.392Z"
+        "correlationId": "4605670b-715c-48cc-8c2a-827a5a70cc36",
+        "path": "/api/v1/admin/users",
+        "timestamp": "2026-11-11T02:29:34.392Z"
       }
     },
     {
@@ -1288,9 +1288,9 @@
         "statusCode": 403,
         "error": "Forbidden",
         "message": "Forbidden",
-        "idCorrelacion": "a9003f71-96a6-4eb8-a8c6-fc6a27eed298",
-        "ruta": "/api/v1/admin/posts",
-        "fecha": "2026-11-11T02:29:34.396Z"
+        "correlationId": "a9003f71-96a6-4eb8-a8c6-fc6a27eed298",
+        "path": "/api/v1/admin/posts",
+        "timestamp": "2026-11-11T02:29:34.396Z"
       }
     },
     {
@@ -1317,9 +1317,9 @@
         "message": [
           "days must be one of the following values: 7, 30"
         ],
-        "idCorrelacion": "b8419fc0-8a30-49f7-aa78-1fd1897f84fd",
-        "ruta": "/api/v1/admin/summary",
-        "fecha": "2026-11-11T02:29:34.420Z"
+        "correlationId": "b8419fc0-8a30-49f7-aa78-1fd1897f84fd",
+        "path": "/api/v1/admin/summary",
+        "timestamp": "2026-11-11T02:29:34.420Z"
       }
     },
     {
@@ -1374,9 +1374,9 @@
         "statusCode": 403,
         "error": "Forbidden",
         "message": "Forbidden",
-        "idCorrelacion": "f7fa9c1e-09dc-4212-8f4c-420f06935dee",
-        "ruta": "/api/v1/admin/users/:id/suspension",
-        "fecha": "2026-11-11T02:29:34.446Z"
+        "correlationId": "f7fa9c1e-09dc-4212-8f4c-420f06935dee",
+        "path": "/api/v1/admin/users/:id/suspension",
+        "timestamp": "2026-11-11T02:29:34.446Z"
       }
     },
     {
@@ -1387,9 +1387,9 @@
         "statusCode": 400,
         "error": "ValidationError",
         "message": "Suspension requires another account, 1–90 days and a reason of 5–500 characters",
-        "idCorrelacion": "10ff284a-55c1-4d44-97e4-0c5e271f473c",
-        "ruta": "/api/v1/admin/users/:id/suspension",
-        "fecha": "2026-11-11T02:29:34.451Z"
+        "correlationId": "10ff284a-55c1-4d44-97e4-0c5e271f473c",
+        "path": "/api/v1/admin/users/:id/suspension",
+        "timestamp": "2026-11-11T02:29:34.451Z"
       }
     },
     {
@@ -1412,9 +1412,9 @@
         "statusCode": 404,
         "error": "NotFound",
         "message": "Not Found",
-        "idCorrelacion": "15ad961c-53b1-44f2-9636-eea38dde9f36",
-        "ruta": "/api/v1/notifications/:id/read",
-        "fecha": "2026-11-11T02:29:34.607Z"
+        "correlationId": "15ad961c-53b1-44f2-9636-eea38dde9f36",
+        "path": "/api/v1/notifications/:id/read",
+        "timestamp": "2026-11-11T02:29:34.607Z"
       }
     },
     {
@@ -1441,9 +1441,9 @@
         "message": [
           "name must be longer than or equal to 3 characters"
         ],
-        "idCorrelacion": "1aa75ccd-5cb9-47a2-823a-99a4bc7d3749",
-        "ruta": "/api/v1/groups",
-        "fecha": "2026-11-11T02:29:35.301Z"
+        "correlationId": "1aa75ccd-5cb9-47a2-823a-99a4bc7d3749",
+        "path": "/api/v1/groups",
+        "timestamp": "2026-11-11T02:29:35.301Z"
       }
     },
     {
@@ -1478,9 +1478,9 @@
         "message": [
           "q must be shorter than or equal to 254 characters"
         ],
-        "idCorrelacion": "e2a38257-885d-4369-a3e7-5fabda0cc032",
-        "ruta": "/api/v1/groups/:id/members",
-        "fecha": "2026-11-11T02:29:35.545Z"
+        "correlationId": "e2a38257-885d-4369-a3e7-5fabda0cc032",
+        "path": "/api/v1/groups/:id/members",
+        "timestamp": "2026-11-11T02:29:35.545Z"
       }
     },
     {
@@ -1493,9 +1493,9 @@
         "message": [
           "q must be shorter than or equal to 254 characters"
         ],
-        "idCorrelacion": "b1c97263-d007-4d7d-b5aa-f980976ffac8",
-        "ruta": "/api/v1/groups",
-        "fecha": "2026-11-11T02:29:35.549Z"
+        "correlationId": "b1c97263-d007-4d7d-b5aa-f980976ffac8",
+        "path": "/api/v1/groups",
+        "timestamp": "2026-11-11T02:29:35.549Z"
       }
     },
     {
@@ -1508,9 +1508,9 @@
         "message": [
           "q must be shorter than or equal to 254 characters"
         ],
-        "idCorrelacion": "5f4c05eb-f469-40cd-9c58-cd602b106dca",
-        "ruta": "/api/v1/posts/search",
-        "fecha": "2026-11-11T02:29:35.551Z"
+        "correlationId": "5f4c05eb-f469-40cd-9c58-cd602b106dca",
+        "path": "/api/v1/posts/search",
+        "timestamp": "2026-11-11T02:29:35.551Z"
       }
     }
   ]

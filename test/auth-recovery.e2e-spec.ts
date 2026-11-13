@@ -120,7 +120,7 @@ describe('auth with real PostgreSQL and local SMTP', () => {
       .send({ email: 'missing@example.test', password: 'Wrong-test-42!' })
       .expect(429);
     expect(limited.headers['retry-after']).toBeDefined();
-    expect((limited.body as { idCorrelacion: string }).idCorrelacion).toBe(
+    expect((limited.body as { correlationId: string }).correlationId).toBe(
       limited.headers['x-request-id'],
     );
     await request(app.getHttpServer() as Server)

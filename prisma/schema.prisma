@@ -146,6 +146,7 @@ model Usuario {
   reportes_realizados Reporte[]           @relation("ReportanteReporte")
   reportes_moderados  Reporte[]           @relation("ModeradorReporte")
   notificaciones      Notificacion[]      @relation("DestinatarioNotificacion")
+  presencias PresenciaSala[]
   operaciones_publicacion OperacionPublicacion[]
 
   // Índice para reactivación programada de cuentas vencidas (Tabla 24, pág. 79)
@@ -518,6 +519,7 @@ model RevisionContenido {
 }
 
 model PresenciaSala {
+  usuario Usuario @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade, onUpdate: NoAction, map: "presencia_sala_id_usuario_fkey")
   conexion String @db.Uuid
   sala String @db.VarChar(80)
   id_usuario BigInt

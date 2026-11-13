@@ -2647,8 +2647,8 @@
               "type": "string",
               "enum": [
                 "visible",
-                "retenido",
-                "eliminado"
+                "retained",
+                "deleted"
               ]
             }
           },
@@ -3896,8 +3896,8 @@
             "type": "string",
             "enum": [
               "visible",
-              "retenido",
-              "eliminado"
+              "retained",
+              "deleted"
             ]
           },
           "createdAt": {
@@ -4104,8 +4104,8 @@
             "type": "string",
             "enum": [
               "visible",
-              "retenido",
-              "eliminado"
+              "retained",
+              "deleted"
             ]
           }
         },
@@ -4408,44 +4408,44 @@
       "AdminUser": {
         "type": "object",
         "properties": {
-          "id_usuario": {
+          "id": {
             "type": "string",
             "pattern": "^[1-9][0-9]{0,18}$",
             "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
           },
-          "nombre": {
+          "firstName": {
             "type": "string"
           },
-          "apellido": {
+          "lastName": {
             "type": "string"
           },
-          "rol": {
+          "role": {
             "type": "string",
             "enum": [
-              "usuario",
-              "administrador"
+              "user",
+              "administrator"
             ]
           },
-          "estado": {
+          "status": {
             "type": "string",
             "enum": [
-              "activo",
-              "suspendido"
+              "active",
+              "suspended"
             ]
           },
-          "suspendido_hasta": {
+          "suspendedUntil": {
             "type": "string",
             "format": "date-time",
             "nullable": true
           }
         },
         "required": [
-          "id_usuario",
-          "nombre",
-          "apellido",
-          "rol",
-          "estado",
-          "suspendido_hasta"
+          "id",
+          "firstName",
+          "lastName",
+          "role",
+          "status",
+          "suspendedUntil"
         ],
         "additionalProperties": false
       },
@@ -4472,45 +4472,45 @@
       "AdminPost": {
         "type": "object",
         "properties": {
-          "id_publicacion": {
+          "postId": {
             "type": "string",
             "pattern": "^[1-9][0-9]{0,18}$",
             "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
           },
-          "titulo": {
+          "title": {
             "type": "string"
           },
-          "estado": {
+          "status": {
             "type": "string",
             "enum": [
               "visible",
-              "retenido",
-              "eliminado"
+              "retained",
+              "deleted"
             ]
           },
           "version": {
             "type": "integer",
             "minimum": 1
           },
-          "id_grupo": {
+          "groupId": {
             "type": "string",
             "pattern": "^[1-9][0-9]{0,18}$",
             "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number.",
             "nullable": true
           },
-          "id_autor": {
+          "authorId": {
             "type": "string",
             "pattern": "^[1-9][0-9]{0,18}$",
             "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
           }
         },
         "required": [
-          "id_publicacion",
-          "titulo",
-          "estado",
+          "postId",
+          "title",
+          "status",
           "version",
-          "id_grupo",
-          "id_autor"
+          "groupId",
+          "authorId"
         ],
         "additionalProperties": false
       },
@@ -4578,14 +4578,14 @@
               }
             ]
           },
-          "idCorrelacion": {
+          "correlationId": {
             "type": "string",
             "format": "uuid"
           },
-          "ruta": {
+          "path": {
             "type": "string"
           },
-          "fecha": {
+          "timestamp": {
             "type": "string",
             "format": "date-time"
           }
@@ -4594,9 +4594,9 @@
           "statusCode",
           "error",
           "message",
-          "idCorrelacion",
-          "ruta",
-          "fecha"
+          "correlationId",
+          "path",
+          "timestamp"
         ],
         "additionalProperties": false
       }

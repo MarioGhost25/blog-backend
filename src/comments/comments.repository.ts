@@ -23,11 +23,17 @@ export function commentDto(row: Row) {
     postId: row.id_publicacion,
     author: {
       id: row.autor.id_usuario,
-      name: row.autor.nombre,
+      firstName: row.autor.nombre,
       lastName: row.autor.apellido,
     },
     content: row.estado === 'eliminado' ? null : row.contenido,
-    status: row.estado,
+    status: (
+      {
+        visible: 'visible',
+        retenido: 'retained',
+        eliminado: 'deleted',
+      } as const
+    )[row.estado],
     createdAt: row.fecha_creacion,
     parent: row.comentario_padre
       ? {

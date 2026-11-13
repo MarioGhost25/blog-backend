@@ -17,13 +17,18 @@ import {
 } from './comments.dto';
 @Injectable()
 export class CommentsService {
-  constructor(private readonly repository: CommentsRepository) {}
+  constructor(
+    private readonly repository: CommentsRepository,
+    private readonly posts: PostsService,
+  ) {}
   list(postId: bigint, query: CommentPageDto, user?: AuthenticatedUser) {
     const cursor = query.cursor ? parsePostId(query.cursor) : undefined;
     return this.repository.withPost(
       postId,
       async (repository, posts) => {
-        const post = await new PostsService(posts).findOne(postId, user);
+        const post = await this.posts.withRepository(posts, () =>
+          this.posts.findOne(postId, user),
+        );
         if (post.status !== 'visible')
           throw new ForbiddenException(
             'Conversation is unavailable until publication approval',
@@ -38,7 +43,9 @@ export class CommentsService {
       ? parsePostId(dto.parentCommentId)
       : undefined;
     return this.repository.withPost(postId, async (repository, posts) => {
-      const post = await new PostsService(posts).findOne(postId, user);
+      const post = await this.posts.withRepository(posts, () =>
+        this.posts.findOne(postId, user),
+      );
       if (
         post.status !== 'visible' ||
         (post.groupId &&
@@ -74,9 +81,8 @@ export class CommentsService {
       async (repository, posts) => {
         const row = await repository.find(id);
         if (!row || row.estado === 'eliminado') throw new NotFoundException();
-        const post = await new PostsService(posts).findOne(
-          row.id_publicacion,
-          user,
+        const post = await this.posts.withRepository(posts, () =>
+          this.posts.findOne(row.id_publicacion, user),
         );
         const role = post.groupId
           ? ((await posts.findGroupMembership(post.groupId, user.id))?.role ??

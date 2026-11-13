@@ -23,11 +23,11 @@ export class NotificationsService {
           row.reporte?.id_reportante === user.id
         ) {
           const outcomes = {
-            pendiente: 'Tu reporte está pendiente de revisión.',
-            desestimado: 'Tu reporte fue revisado y desestimado.',
-            contenido_retirado: 'Se retiró el contenido de tu reporte.',
+            pendiente: 'Your report is awaiting review.',
+            desestimado: 'Your report was reviewed and dismissed.',
+            contenido_retirado: 'The reported content was removed.',
             usuario_suspendido:
-              'Se retiró el contenido de tu reporte y se suspendió a su autor.',
+              'The reported content was removed and its author suspended.',
           };
           message = outcomes[row.reporte.estado];
         }
@@ -35,25 +35,34 @@ export class NotificationsService {
           const groupId =
             row.reporte.publicacion?.id_grupo ??
             row.reporte.comentario?.publicacion.id_grupo;
-          if (user.role === 'administrador') href = '/moderacion';
+          if (user.role === 'administrador') href = '/moderation';
           else if (
             groupId &&
             (await this.repository.canModerateGroup(user.id, groupId))
           )
-            href = `/grupos/${groupId}/moderacion`;
+            href = `/groups/${groupId}/moderation`;
         }
         const postId =
           row.publicacion?.id_publicacion ?? row.comentario?.id_publicacion;
         if (postId && (!row.comentario || row.comentario.estado === 'visible'))
           try {
             await this.posts.findOne(postId, user);
-            href = `/publicaciones/${postId}`;
+            href = `/posts/${postId}`;
           } catch {
             /* A neutral persisted notice never discloses revoked content. */
           }
         return {
           id: row.id_notificacion,
-          type: row.tipo,
+          type: (
+            {
+              comentario: 'comment',
+              respuesta: 'reply',
+              publicacion_grupo: 'group_post',
+              resultado_reporte: 'report_result',
+              contenido_retirado: 'content_removed',
+              nuevo_reporte: 'new_report',
+            } as const
+          )[row.tipo],
           message,
           href,
           createdAt: row.fecha_creacion,

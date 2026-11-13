@@ -287,7 +287,7 @@ async function main() {
     if (i === 30) {
       const body = await result.json();
       assert.equal(body.error, 'RateLimited');
-      assert.equal(body.idCorrelacion, result.headers()['x-request-id']);
+      assert.equal(body.correlationId, result.headers()['x-request-id']);
       assert.equal(String(body.retryAfter), result.headers()['retry-after']);
     }
   }

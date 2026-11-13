@@ -92,7 +92,14 @@ export class ModerationService {
     return {
       id: row.id_reporte,
       reason: row.motivo,
-      status: row.estado,
+      status: (
+        {
+          pendiente: 'pending',
+          desestimado: 'dismissed',
+          contenido_retirado: 'content_removed',
+          usuario_suspendido: 'user_suspended',
+        } as const
+      )[row.estado],
       observation: row.observacion,
       createdAt: row.fecha_creacion,
       postId: post.id_publicacion,
@@ -101,7 +108,13 @@ export class ModerationService {
       content: row.comentario?.contenido ?? post.contenido,
       type: row.id_comentario ? 'comment' : 'post',
       targetId: row.id_comentario ?? row.id_publicacion,
-      contentStatus: row.comentario?.estado ?? post.estado,
+      contentStatus: (
+        {
+          visible: 'visible',
+          retenido: 'retained',
+          eliminado: 'deleted',
+        } as const
+      )[row.comentario?.estado ?? post.estado],
     };
   }
   async detail(id: bigint, user: AuthenticatedUser) {

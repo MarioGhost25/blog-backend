@@ -4,7 +4,7 @@ import { CommentsModule } from '../src/comments/comments.module';
 import { NotificationsModule } from '../src/notifications/notifications.module';
 import { ModerationModule } from '../src/moderation/moderation.module';
 import { RealtimeModule } from '../src/realtime/realtime.module';
-import { WebSocket } from 'ws';
+import { io } from 'socket.io-client';
 import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
 import { randomBytes } from 'node:crypto';
@@ -1553,26 +1553,17 @@ describe('G02 roles, privacy and revocation with real PostgreSQL/HTTP', () => {
     origin = 'http://localhost:3000',
   ) {
     const port = (instance.getHttpServer() as Server).address() as AddressInfo;
-    const socket = new WebSocket(`ws://127.0.0.1:${port.port}/tiempo-real`, {
-      headers: {
+    const socket = io(`http://127.0.0.1:${port.port}/realtime`, {
+      transports: ['websocket'],
+      reconnection: false,
+      extraHeaders: {
         Origin: origin,
         ...(actor ? { Cookie: cookies.get(actor)! } : {}),
       },
     });
     const events: { event: string; data: { room?: string; count?: number } }[] =
       [];
-    socket.on('message', (raw) => {
-      events.push(
-        JSON.parse(
-          (Array.isArray(raw)
-            ? Buffer.concat(raw)
-            : Buffer.isBuffer(raw)
-              ? raw
-              : Buffer.from(raw)
-          ).toString(),
-        ) as (typeof events)[number],
-      );
-    });
+    socket.onAny((event, data) => events.push({ event, data }));
     const wait = (
       name: string,
       predicate: (event: (typeof events)[number]) => boolean = () => true,
@@ -1584,18 +1575,18 @@ describe('G02 roles, privacy and revocation with real PostgreSQL/HTTP', () => {
           return;
         }
         const timer = setTimeout(() => {
-          socket.off('message', listener);
+          socket.offAny(listener);
           reject(new Error(`Missing socket event ${name}`));
         }, 5000);
         const listener = () => {
           const found = events.find((e) => e.event === name && predicate(e));
           if (found) {
             clearTimeout(timer);
-            socket.off('message', listener);
+            socket.offAny(listener);
             resolve(found);
           }
         };
-        socket.on('message', listener);
+        socket.onAny(listener);
       });
     return { socket, events, wait };
   }
@@ -1607,13 +1598,11 @@ describe('G02 roles, privacy and revocation with real PostgreSQL/HTTP', () => {
     ] as const) {
       const ws = websocket(app, actor, origin).socket;
       await new Promise<void>((resolve, reject) => {
-        ws.on('unexpected-response', (_req, res) => {
-          expect(res.statusCode).toBe(401);
-          ws.terminate();
+        ws.on('connect_error', () => {
+          ws.disconnect();
           resolve();
         });
-        ws.on('open', () => reject(new Error('Unauthorized upgrade')));
-        ws.on('error', () => undefined);
+        ws.on('connect', () => reject(new Error('Unauthorized connection')));
       });
     }
   });
@@ -1624,45 +1613,38 @@ describe('G02 roles, privacy and revocation with real PostgreSQL/HTTP', () => {
       c = websocket(secondary, 3);
     try {
       await Promise.all([
-        a.wait('conexion:lista'),
-        b.wait('conexion:lista'),
-        c.wait('conexion:lista'),
+        a.wait('connection:ready'),
+        b.wait('connection:ready'),
+        c.wait('connection:ready'),
       ]);
       for (const client of [a, b, c])
-        client.socket.send(
-          JSON.stringify({
-            event: 'sala:unirse',
-            data: { type: 'publicacion', id: String(f.visible) },
-          }),
-        );
+        client.socket.emit('room:join', {
+          type: 'post',
+          id: String(f.visible),
+        });
       await Promise.all([
-        a.wait('presencia:conectados', (e) => e.data.count === 2),
-        b.wait('presencia:conectados', (e) => e.data.count === 2),
+        a.wait('presence:connected', (e) => e.data.count === 2),
+        b.wait('presence:connected', (e) => e.data.count === 2),
       ]);
       await http('post', `/posts/${f.visible}/comments`, 3)
         .send({ content: 'Committed across instances' })
         .expect(201);
-      await Promise.all([
-        a.wait('comentario:nuevo'),
-        b.wait('comentario:nuevo'),
-      ]);
+      await Promise.all([a.wait('comment:new'), b.wait('comment:new')]);
       expect(JSON.stringify(b.events)).not.toContain(
         'Committed across instances',
       );
-      const before = b.events.filter(
-        (e) => e.event === 'comentario:nuevo',
-      ).length;
+      const before = b.events.filter((e) => e.event === 'comment:new').length;
       await http('delete', `/groups/${f.a}/members/2`, 1).expect(204);
-      await Promise.all([a.wait('acceso:revocado'), b.wait('acceso:revocado')]);
+      await Promise.all([a.wait('access:revoked'), b.wait('access:revoked')]);
       await http('post', `/posts/${f.visible}/comments`, 3)
         .send({ content: 'After revocation' })
         .expect(201);
       await new Promise((resolve) => setTimeout(resolve, 250));
-      expect(
-        b.events.filter((e) => e.event === 'comentario:nuevo'),
-      ).toHaveLength(before);
+      expect(b.events.filter((e) => e.event === 'comment:new')).toHaveLength(
+        before,
+      );
     } finally {
-      for (const client of [a, b, c]) client.socket.terminate();
+      for (const client of [a, b, c]) client.socket.disconnect();
     }
   });
 

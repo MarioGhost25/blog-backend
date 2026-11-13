@@ -1,5 +1,9 @@
 import type { EstadoUsuario, RolGlobal, EstadoContenido } from '@prisma/client';
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+} from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { AdminRepository } from './admin.repository';
 @Injectable()
@@ -29,7 +33,41 @@ export class AdminService {
     reason?: string,
   ) {
     this.authorize(user);
-    return this.repository.suspension(id, user.id, days, reason);
+    if (id === user.id)
+      throw new BadRequestException('Cannot change your own suspension');
+    if (
+      days !== undefined &&
+      (!Number.isInteger(days) ||
+        days < 1 ||
+        days > 90 ||
+        !reason ||
+        reason.trim().length < 5 ||
+        reason.length > 500)
+    )
+      throw new BadRequestException(
+        'Suspension requires 1–90 days and a reason of 5–500 characters',
+      );
+    return this.repository.updateSuspension(
+      id,
+      user.id,
+      days === undefined
+        ? {
+            estado: 'activo',
+            suspendido_hasta: null,
+            motivo_suspension: null,
+            suspendido_por: null,
+          }
+        : {
+            estado: 'suspendido',
+            suspendido_hasta: new Date(Date.now() + days * 86400000),
+            motivo_suspension: reason!,
+            suspendido_por: user.id,
+          },
+      (current) => {
+        if (current?.rol !== 'administrador' || current.estado !== 'activo')
+          throw new ForbiddenException();
+      },
+    );
   }
   posts(
     q?: string,
