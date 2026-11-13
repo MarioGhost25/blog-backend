@@ -1,3 +1,5 @@
+import { ActionOwnerGuard } from './guards/action-owner.guard';
+import { SuspensionExpiryService } from './suspension-expiry.service';
 import { Module } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
@@ -8,10 +10,13 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { AuthRepository } from './auth.repository';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
-
+import { MailModule } from '../mail/mail.module';
+import { AuthRateLimitGuard } from './guards/auth-rate-limit.guard';
+import { APP_GUARD } from '@nestjs/core';
 
 @Module({
   imports: [
+    MailModule,
     ConfigModule,
     PrismaModule,
     PassportModule.register({ defaultStrategy: 'jwt', session: false }),
@@ -25,7 +30,16 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, AuthRepository, JwtStrategy, JwtAuthGuard],
-  exports: [AuthService, JwtStrategy, JwtAuthGuard],
+  providers: [
+    AuthService,
+    AuthRepository,
+    SuspensionExpiryService,
+    JwtStrategy,
+    JwtAuthGuard,
+    ActionOwnerGuard,
+    AuthRateLimitGuard,
+    { provide: APP_GUARD, useExisting: AuthRateLimitGuard },
+  ],
+  exports: [AuthService, JwtStrategy, JwtAuthGuard, ActionOwnerGuard],
 })
 export class AuthModule {}

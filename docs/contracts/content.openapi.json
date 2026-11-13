@@ -1,0 +1,4605 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Blog estudiantil — contenido y comunidad",
+    "version": "1.0.0",
+    "description": "Contrato Nest local revisado 2026-11-10. Complementa auth.openapi.yaml del frontend; no implica Swagger runtime ni verificación del servidor remoto. Esquemas de entradas describen el formato recomendado; @IsOptional permite null en campos opcionales y existen validaciones semánticas de servicio descritas por operación. WebSocket /tiempo-real se documenta fuera de REST."
+  },
+  "servers": [
+    {
+      "url": "/api/v1"
+    }
+  ],
+  "paths": {
+    "/categories": {
+      "get": {
+        "operationId": "get__categories",
+        "summary": "Catálogo público",
+        "description": "",
+        "tags": [
+          "categories"
+        ],
+        "security": [],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Respuesta correcta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Category"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/posts": {
+      "get": {
+        "operationId": "get__posts",
+        "summary": "Muro público",
+        "description": "",
+        "tags": [
+          "posts"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 254
+            }
+          },
+          {
+            "in": "query",
+            "name": "categoryId",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta correcta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "post__posts",
+        "summary": "Crear publicación",
+        "description": "Con clave devuelve Receipt; sin clave devuelve Post. Grupo: exige membresía. Texto prohibido queda retenido; contenido HTML se sanitiza.",
+        "tags": [
+          "posts"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Post-Owner",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            },
+            "description": "Cuenta que abrió el formulario. Obligatorio con Idempotency-Key y para consultar recibos; si se envía en mutaciones protegidas debe coincidir con la sesión."
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "description": "UUID v4 canónico. Reutilizar sólo con la misma cuenta, método, destino y contenido; discrepancia produce 409."
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Respuesta correcta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Post"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Receipt"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePost"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/posts/search": {
+      "get": {
+        "operationId": "get__posts_search",
+        "summary": "Búsqueda pública",
+        "description": "",
+        "tags": [
+          "posts"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 254
+            }
+          },
+          {
+            "in": "query",
+            "name": "categoryId",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta correcta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/posts/group/{groupId}": {
+      "get": {
+        "operationId": "get__posts_group_groupId_",
+        "summary": "Muro del grupo",
+        "description": "Membresía vigente o administrador global para lectura.",
+        "tags": [
+          "posts"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "groupId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 254
+            }
+          },
+          {
+            "in": "query",
+            "name": "categoryId",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta correcta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/me/feed": {
+      "get": {
+        "operationId": "get__users_me_feed",
+        "summary": "Muro personal",
+        "description": "",
+        "tags": [
+          "users"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 254
+            }
+          },
+          {
+            "in": "query",
+            "name": "categoryId",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta correcta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/me/posts": {
+      "get": {
+        "operationId": "get__users_me_posts",
+        "summary": "Publicaciones propias",
+        "description": "Página fija de 20. No admite limit. Excluye contenido grupal cuando se perdió acceso.",
+        "tags": [
+          "users"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "visible",
+                "held",
+                "deleted"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta correcta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnPostPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/posts/{id}": {
+      "get": {
+        "operationId": "get__posts_id_",
+        "summary": "Detalle y permisos",
+        "description": "",
+        "tags": [
+          "posts"
+        ],
+        "security": [
+          {},
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta correcta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "patch__posts_id_",
+        "summary": "Editar publicación",
+        "description": "Sólo autor con acceso actual. version requerida; conflicto 409. Con clave devuelve Receipt.",
+        "tags": [
+          "posts"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Post-Owner",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            },
+            "description": "Cuenta que abrió el formulario. Obligatorio con Idempotency-Key y para consultar recibos; si se envía en mutaciones protegidas debe coincidir con la sesión."
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "description": "UUID v4 canónico. Reutilizar sólo con la misma cuenta, método, destino y contenido; discrepancia produce 409."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta correcta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Post"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Receipt"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePost"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "delete__posts_id_",
+        "summary": "Retirar publicación",
+        "description": "Autor o moderador autorizado. Observation obligatoria si no es autor. Rama idempotente exclusiva del autor; recuperar recibo por GET.",
+        "tags": [
+          "posts"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Post-Owner",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            },
+            "description": "Cuenta que abrió el formulario. Obligatorio con Idempotency-Key y para consultar recibos; si se envía en mutaciones protegidas debe coincidir con la sesión."
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "description": "UUID v4 canónico. Reutilizar sólo con la misma cuenta, método, destino y contenido; discrepancia produce 409."
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Operación completada, sin cuerpo."
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoveContent"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/posts/operations/{key}": {
+      "get": {
+        "operationId": "get__posts_operations_key_",
+        "summary": "Consultar recibo",
+        "description": "",
+        "tags": [
+          "posts"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Post-Owner",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            },
+            "description": "Cuenta que abrió el formulario. Obligatorio con Idempotency-Key y para consultar recibos; si se envía en mutaciones protegidas debe coincidir con la sesión."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta correcta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Receipt"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UnknownOperation"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/posts/{id}/attachments": {
+      "post": {
+        "operationId": "post__posts_id_attachments",
+        "summary": "Añadir recurso",
+        "description": "Sólo autor. JPEG/PNG/PDF validado por bytes, hasta 10 MiB en Nest; BFF limita a 4 MiB. Link requiere URL HTTP(S). Máximo y orden ver política de adjuntos.",
+        "tags": [
+          "posts"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Post-Owner",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            },
+            "description": "Cuenta que abrió el formulario. Obligatorio con Idempotency-Key y para consultar recibos; si se envía en mutaciones protegidas debe coincidir con la sesión."
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Respuesta correcta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Attachment"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkInput"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/FileInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/posts/{id}/attachments/{attachmentId}/content": {
+      "get": {
+        "operationId": "get__posts_id_attachments_attachmentId_content",
+        "summary": "Descargar recurso protegido",
+        "description": "Revalida acceso antes y después de leer. private,no-store; Vary Cookie; nosniff; CSP sandbox. Legados no migrados: 410. Documentos como attachment.",
+        "tags": [
+          "posts"
+        ],
+        "security": [
+          {},
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            }
+          },
+          {
+            "in": "path",
+            "name": "attachmentId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta correcta.",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/posts/{id}/attachments/order": {
+      "patch": {
+        "operationId": "patch__posts_id_attachments_order",
+        "summary": "Ordenar recursos",
+        "description": "Sólo autor. Deben enviarse todos los IDs, exactamente una vez, como números.",
+        "tags": [
+          "posts"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Post-Owner",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            },
+            "description": "Cuenta que abrió el formulario. Obligatorio con Idempotency-Key y para consultar recibos; si se envía en mutaciones protegidas debe coincidir con la sesión."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta correcta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Attachment"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttachmentOrder"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/posts/{id}/attachments/{attachmentId}": {
+      "delete": {
+        "operationId": "delete__posts_id_attachments_attachmentId_",
+        "summary": "Eliminar recurso",
+        "description": "",
+        "tags": [
+          "posts"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            }
+          },
+          {
+            "in": "path",
+            "name": "attachmentId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Post-Owner",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            },
+            "description": "Cuenta que abrió el formulario. Obligatorio con Idempotency-Key y para consultar recibos; si se envía en mutaciones protegidas debe coincidir con la sesión."
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Operación completada, sin cuerpo."
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/groups": {
+      "post": {
+        "operationId": "post__groups",
+        "summary": "Crear grupo",
+        "description": "Creador pasa a administrador local.",
+        "tags": [
+          "groups"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "Respuesta correcta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Group"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGroup"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "get__groups",
+        "summary": "Catálogo de grupos",
+        "description": "",
+        "tags": [
+          "groups"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 254
+            }
+          },
+          {
+            "in": "query",
+            "name": "categoryId",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[1-9][0-9]{0,18}$",
+                  "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+                },
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "mine",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta correcta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/groups/{id}": {
+      "get": {
+        "operationId": "get__groups_id_",
+        "summary": "Detalle del grupo",
+        "description": "",
+        "tags": [
+          "groups"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta correcta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/groups/{id}/members": {
+      "post": {
+        "operationId": "post__groups_id_members",
+        "summary": "Unirse como miembro",
+        "description": "",
+        "tags": [
+          "groups"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Respuesta correcta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Membership"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "get__groups_id_members",
+        "summary": "Listar miembros",
+        "description": "Requiere membresía; no expone correo.",
+        "tags": [
+          "groups"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 254
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta correcta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/groups/{id}/members/me": {
+      "delete": {
+        "operationId": "delete__groups_id_members_me",
+        "summary": "Salir del grupo",
+        "description": "Último administrador: 409; transferir antes.",
+        "tags": [
+          "groups"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Operación completada, sin cuerpo."
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/groups/{id}/members/{userId}": {
+      "patch": {
+        "operationId": "patch__groups_id_members_userId_",
+        "summary": "Cambiar rol local",
+        "description": "Administrador local vigente; conservar al menos uno.",
+        "tags": [
+          "groups"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            }
+          },
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta correcta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Membership"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeRole"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "delete__groups_id_members_userId_",
+        "summary": "Expulsar miembro",
+        "description": "Administrador local vigente; conservar al menos uno.",
+        "tags": [
+          "groups"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            }
+          },
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Operación completada, sin cuerpo."
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/groups/{id}/transfer": {
+      "post": {
+        "operationId": "post__groups_id_transfer",
+        "summary": "Transferir administración",
+        "description": "Administrador local a otro miembro; leave determina salida del actor.",
+        "tags": [
+          "groups"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Operación completada, sin cuerpo."
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Transfer"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/posts/{id}/comments": {
+      "get": {
+        "operationId": "get__posts_id_comments",
+        "summary": "Conversación paginada",
+        "description": "Orden fecha/id descendente. Retenidos sólo para autor; retirados con hijos se muestran sin contenido.",
+        "tags": [
+          "posts"
+        ],
+        "security": [
+          {},
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta correcta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommentPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "post__posts_id_comments",
+        "summary": "Comentar o responder",
+        "description": "Publicación visible; membresía para escribir en grupo. Padre visible del mismo post.",
+        "tags": [
+          "posts"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Post-Owner",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            },
+            "description": "Cuenta que abrió el formulario. Obligatorio con Idempotency-Key y para consultar recibos; si se envía en mutaciones protegidas debe coincidir con la sesión."
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Respuesta correcta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Comment"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateComment"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/comments/{id}": {
+      "delete": {
+        "operationId": "delete__comments_id_",
+        "summary": "Retirar comentario",
+        "description": "Observation obligatoria para retirar contenido ajeno; audita moderación.",
+        "tags": [
+          "comments"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Post-Owner",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            },
+            "description": "Cuenta que abrió el formulario. Obligatorio con Idempotency-Key y para consultar recibos; si se envía en mutaciones protegidas debe coincidir con la sesión."
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Operación completada, sin cuerpo."
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoveContent"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reports": {
+      "post": {
+        "operationId": "post__reports",
+        "summary": "Reportar un objetivo",
+        "description": "Exactamente postId o commentId; contenido visible y accesible. Duplicado 409.",
+        "tags": [
+          "reports"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Post-Owner",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            },
+            "description": "Cuenta que abrió el formulario. Obligatorio con Idempotency-Key y para consultar recibos; si se envía en mutaciones protegidas debe coincidir con la sesión."
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Respuesta correcta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportCreated"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateReport"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/moderation/reports": {
+      "get": {
+        "operationId": "get__moderation_reports",
+        "summary": "Cola de reportes",
+        "description": "",
+        "tags": [
+          "moderation"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "groupId",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pendiente",
+                "desestimado",
+                "contenido_retirado",
+                "usuario_suspendido"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "type",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "post",
+                "comment"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta correcta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/moderation/reports/{id}": {
+      "get": {
+        "operationId": "get__moderation_reports_id_",
+        "summary": "Detalle de reporte",
+        "description": "",
+        "tags": [
+          "moderation"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta correcta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Report"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "patch__moderation_reports_id_",
+        "summary": "Resolver reporte",
+        "description": "Global o moderación local del grupo. Suspender sólo global, nunca a sí mismo; suspensionDays obligatorio, observation máximo 500 para suspensión. Una resolución por reporte.",
+        "tags": [
+          "moderation"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Post-Owner",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            },
+            "description": "Cuenta que abrió el formulario. Obligatorio con Idempotency-Key y para consultar recibos; si se envía en mutaciones protegidas debe coincidir con la sesión."
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Operación completada, sin cuerpo."
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveReport"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/moderation/retained": {
+      "get": {
+        "operationId": "get__moderation_retained",
+        "summary": "Cola de retenidos",
+        "description": "",
+        "tags": [
+          "moderation"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "groupId",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pendiente",
+                "desestimado",
+                "contenido_retirado",
+                "usuario_suspendido"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "type",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "post",
+                "comment"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta correcta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetainedPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/moderation/retained/{type}/{id}": {
+      "patch": {
+        "operationId": "patch__moderation_retained_type_id_",
+        "summary": "Revisar retenido",
+        "description": "Global o moderación local. version obligatoria para post; coincidencia requerida o 409. No restaura eliminados.",
+        "tags": [
+          "moderation"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "type",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "post",
+                "comment"
+              ]
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Post-Owner",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            },
+            "description": "Cuenta que abrió el formulario. Obligatorio con Idempotency-Key y para consultar recibos; si se envía en mutaciones protegidas debe coincidir con la sesión."
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Operación completada, sin cuerpo."
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Review"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notifications": {
+      "get": {
+        "operationId": "get__notifications",
+        "summary": "Notificaciones de la cuenta",
+        "description": "",
+        "tags": [
+          "notifications"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "unread",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta correcta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notifications/unread/count": {
+      "get": {
+        "operationId": "get__notifications_unread_count",
+        "summary": "Contar sin leer",
+        "description": "",
+        "tags": [
+          "notifications"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Respuesta correcta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Count"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notifications/read": {
+      "patch": {
+        "operationId": "patch__notifications_read",
+        "summary": "Marcar leídas hasta ID",
+        "description": "Sólo propias y con ID ≤ throughId; no consume avisos posteriores.",
+        "tags": [
+          "notifications"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "Operación completada, sin cuerpo."
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReadThrough"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notifications/{id}/read": {
+      "patch": {
+        "operationId": "patch__notifications_id_read",
+        "summary": "Marcar leída",
+        "description": "Sólo propia; ajena 404.",
+        "tags": [
+          "notifications"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Operación completada, sin cuerpo."
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/summary": {
+      "get": {
+        "operationId": "get__admin_summary",
+        "summary": "Resumen global",
+        "description": "Sólo administrador global. Ventana 7 por defecto. Posts/comments visibles creados en ventana; otros contadores son totales actuales.",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "7",
+                "30"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta correcta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Summary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/users": {
+      "get": {
+        "operationId": "get__admin_users",
+        "summary": "Usuarios para administración",
+        "description": "Sólo administrador global.",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 254
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "role",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "usuario",
+                "administrador"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "activo",
+                "suspendido"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta correcta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/users/{id}/suspension": {
+      "patch": {
+        "operationId": "patch__admin_users_id_suspension",
+        "summary": "Suspender cuenta",
+        "description": "Sólo administrador global activo; nunca a sí mismo. 1–90 días. No recibe until ni reportId.",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Post-Owner",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            },
+            "description": "Cuenta que abrió el formulario. Obligatorio con Idempotency-Key y para consultar recibos; si se envía en mutaciones protegidas debe coincidir con la sesión."
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Operación completada, sin cuerpo."
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Suspension"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "delete__admin_users_id_suspension",
+        "summary": "Reactivar cuenta",
+        "description": "Sólo administrador global activo; elimina suspensión vigente.",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Post-Owner",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            },
+            "description": "Cuenta que abrió el formulario. Obligatorio con Idempotency-Key y para consultar recibos; si se envía en mutaciones protegidas debe coincidir con la sesión."
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Operación completada, sin cuerpo."
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/posts": {
+      "get": {
+        "operationId": "get__admin_posts",
+        "summary": "Inventario global de publicaciones",
+        "description": "Sólo administrador global. Retirar/revisar usa las rutas de posts/moderation; no existe PATCH admin/posts/status.",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 254
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "visible",
+                "retained",
+                "deleted"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "scope",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "public",
+                "group"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "categoryId",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta correcta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminPostPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error HTTP. 400 validación; 401 sesión; 403 permisos/cuenta; 404 inexistente o no visible; 409 versión/invariantes; 410 recurso legado; 413 tamaño; 429 límite; 5xx infraestructura. Aplican según operación; no todos se generan en cada ruta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "cookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "jwt"
+      }
+    },
+    "schemas": {
+      "Category": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "categoryId",
+          "name",
+          "description"
+        ],
+        "additionalProperties": false
+      },
+      "Attachment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+          },
+          "postId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "image",
+              "document",
+              "link"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "order": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "id",
+          "postId",
+          "type",
+          "title",
+          "url",
+          "order"
+        ],
+        "additionalProperties": false
+      },
+      "Post": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+          },
+          "authorId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+          },
+          "categoryId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+          },
+          "groupId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number.",
+            "nullable": true
+          },
+          "title": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "visible",
+              "retained",
+              "deleted"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "author": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,18}$",
+                "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+              },
+              "firstName": {
+                "type": "string"
+              },
+              "lastName": {
+                "type": "string"
+              },
+              "photoUrl": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "firstName",
+              "lastName",
+              "photoUrl"
+            ],
+            "additionalProperties": false
+          },
+          "category": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,18}$",
+                "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+              },
+              "name": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "description"
+            ],
+            "additionalProperties": false
+          },
+          "group": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,18}$",
+                "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Attachment"
+            }
+          },
+          "commentCount": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "id",
+          "authorId",
+          "categoryId",
+          "groupId",
+          "title",
+          "content",
+          "status",
+          "version",
+          "createdAt",
+          "updatedAt",
+          "author",
+          "category",
+          "group",
+          "attachments",
+          "commentCount"
+        ],
+        "additionalProperties": false
+      },
+      "PostDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+          },
+          "authorId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+          },
+          "categoryId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+          },
+          "groupId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number.",
+            "nullable": true
+          },
+          "title": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "visible",
+              "retained",
+              "deleted"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "author": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,18}$",
+                "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+              },
+              "firstName": {
+                "type": "string"
+              },
+              "lastName": {
+                "type": "string"
+              },
+              "photoUrl": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "firstName",
+              "lastName",
+              "photoUrl"
+            ],
+            "additionalProperties": false
+          },
+          "category": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,18}$",
+                "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+              },
+              "name": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "description"
+            ],
+            "additionalProperties": false
+          },
+          "group": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,18}$",
+                "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Attachment"
+            }
+          },
+          "commentCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "permissions": {
+            "type": "object",
+            "properties": {
+              "edit": {
+                "type": "boolean"
+              },
+              "moderate": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "edit",
+              "moderate"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "authorId",
+          "categoryId",
+          "groupId",
+          "title",
+          "content",
+          "status",
+          "version",
+          "createdAt",
+          "updatedAt",
+          "author",
+          "category",
+          "group",
+          "attachments",
+          "commentCount",
+          "permissions"
+        ],
+        "additionalProperties": false
+      },
+      "PostPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Post"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "OwnPost": {
+        "type": "object",
+        "properties": {
+          "postId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+          },
+          "authorId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+          },
+          "categoryId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+          },
+          "groupId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number.",
+            "nullable": true
+          },
+          "title": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "visible",
+              "held",
+              "deleted"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "category": {
+            "type": "object",
+            "properties": {
+              "categoryId": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,18}$",
+                "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+              },
+              "name": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "categoryId",
+              "name",
+              "description"
+            ],
+            "additionalProperties": false
+          },
+          "_count": {
+            "type": "object",
+            "properties": {
+              "comments": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "attachments": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "comments",
+              "attachments"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "postId",
+          "authorId",
+          "categoryId",
+          "groupId",
+          "title",
+          "content",
+          "status",
+          "version",
+          "createdAt",
+          "updatedAt",
+          "category",
+          "_count"
+        ],
+        "additionalProperties": false
+      },
+      "OwnPostPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwnPost"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "Receipt": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "confirmed"
+            ]
+          },
+          "key": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "POST",
+              "PATCH",
+              "DELETE"
+            ]
+          },
+          "postId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "status",
+          "key",
+          "method",
+          "postId",
+          "version"
+        ],
+        "additionalProperties": false
+      },
+      "UnknownOperation": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "unknown"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "CreatePost": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 150
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 20000
+          },
+          "categoryId": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "groupId": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "title",
+          "content",
+          "categoryId"
+        ],
+        "additionalProperties": false
+      },
+      "UpdatePost": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 150
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 20000
+          },
+          "categoryId": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "additionalProperties": false
+      },
+      "RemoveContent": {
+        "type": "object",
+        "properties": {
+          "observation": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 1000
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "LinkInput": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "link"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 150
+          },
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "format": "uri",
+            "pattern": "^https?://"
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "FileInput": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "image",
+              "document"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 150
+          },
+          "file": {
+            "type": "string",
+            "format": "binary"
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "file"
+        ],
+        "additionalProperties": false
+      },
+      "AttachmentOrder": {
+        "type": "object",
+        "properties": {
+          "attachmentIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "attachmentIds"
+        ],
+        "additionalProperties": false
+      },
+      "Group": {
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+          },
+          "categoryId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+          },
+          "creatorId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "category": {
+            "type": "object",
+            "properties": {
+              "categoryId": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,18}$",
+                "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+              },
+              "name": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "categoryId",
+              "name",
+              "description"
+            ],
+            "additionalProperties": false
+          },
+          "_count": {
+            "type": "object",
+            "properties": {
+              "members": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "members"
+            ],
+            "additionalProperties": false
+          },
+          "myRole": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "member",
+              "moderator",
+              "administrator",
+              null
+            ]
+          }
+        },
+        "required": [
+          "groupId",
+          "categoryId",
+          "creatorId",
+          "name",
+          "description",
+          "createdAt",
+          "category",
+          "_count",
+          "myRole"
+        ],
+        "additionalProperties": false
+      },
+      "GroupDetail": {
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+          },
+          "categoryId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+          },
+          "creatorId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "category": {
+            "type": "object",
+            "properties": {
+              "categoryId": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,18}$",
+                "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+              },
+              "name": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "categoryId",
+              "name",
+              "description"
+            ],
+            "additionalProperties": false
+          },
+          "_count": {
+            "type": "object",
+            "properties": {
+              "members": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "members"
+            ],
+            "additionalProperties": false
+          },
+          "myRole": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "member",
+              "moderator",
+              "administrator",
+              null
+            ]
+          },
+          "administrators": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "userId": {
+                  "type": "string",
+                  "pattern": "^[1-9][0-9]{0,18}$",
+                  "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+                },
+                "name": {
+                  "type": "string"
+                },
+                "lastName": {
+                  "type": "string"
+                },
+                "photoUrl": {
+                  "type": "string",
+                  "nullable": true
+                }
+              },
+              "required": [
+                "userId",
+                "name",
+                "lastName",
+                "photoUrl"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "groupId",
+          "categoryId",
+          "creatorId",
+          "name",
+          "description",
+          "createdAt",
+          "category",
+          "_count",
+          "myRole",
+          "administrators"
+        ],
+        "additionalProperties": false
+      },
+      "GroupPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Group"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "Membership": {
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+          },
+          "userId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "member",
+              "moderator",
+              "administrator"
+            ]
+          },
+          "joinedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "groupId",
+          "userId",
+          "role",
+          "joinedAt"
+        ],
+        "additionalProperties": false
+      },
+      "Member": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "member",
+              "moderator",
+              "administrator"
+            ]
+          },
+          "joinedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "user": {
+            "type": "object",
+            "properties": {
+              "userId": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,18}$",
+                "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+              },
+              "name": {
+                "type": "string"
+              },
+              "lastName": {
+                "type": "string"
+              },
+              "major": {
+                "type": "string",
+                "nullable": true
+              },
+              "photoUrl": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "userId",
+              "name",
+              "lastName",
+              "major",
+              "photoUrl"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "role",
+          "joinedAt",
+          "user"
+        ],
+        "additionalProperties": false
+      },
+      "MemberPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Member"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "CreateGroup": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 100
+          },
+          "categoryId": {
+            "oneOf": [
+              {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,18}$",
+                "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+              },
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              }
+            ]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "name",
+          "categoryId"
+        ],
+        "additionalProperties": false
+      },
+      "ChangeRole": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "member",
+              "moderator",
+              "administrator"
+            ]
+          }
+        },
+        "required": [
+          "role"
+        ],
+        "additionalProperties": false
+      },
+      "Transfer": {
+        "type": "object",
+        "properties": {
+          "newAdministratorId": {
+            "oneOf": [
+              {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,18}$",
+                "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+              },
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              }
+            ]
+          },
+          "leave": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "newAdministratorId",
+          "leave"
+        ],
+        "additionalProperties": false
+      },
+      "Comment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+          },
+          "postId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+          },
+          "author": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,18}$",
+                "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+              },
+              "name": {
+                "type": "string"
+              },
+              "lastName": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "lastName"
+            ],
+            "additionalProperties": false
+          },
+          "content": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "visible",
+              "retained",
+              "deleted"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "parent": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,18}$",
+                "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+              },
+              "content": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "content"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "postId",
+          "author",
+          "content",
+          "status",
+          "createdAt",
+          "parent"
+        ],
+        "additionalProperties": false
+      },
+      "CommentPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Comment"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "CreateComment": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "parentCommentId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "CreateReport": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "postId": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,18}$",
+                "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 5,
+                "maxLength": 500
+              }
+            },
+            "required": [
+              "postId",
+              "reason"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "commentId": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,18}$",
+                "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 5,
+                "maxLength": 500
+              }
+            },
+            "required": [
+              "commentId",
+              "reason"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "ReportCreated": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pendiente",
+              "desestimado",
+              "contenido_retirado",
+              "usuario_suspendido"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "Report": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+          },
+          "reason": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pendiente",
+              "desestimado",
+              "contenido_retirado",
+              "usuario_suspendido"
+            ]
+          },
+          "observation": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "postId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+          },
+          "groupId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number.",
+            "nullable": true
+          },
+          "title": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "post",
+              "comment"
+            ]
+          },
+          "targetId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+          },
+          "contentStatus": {
+            "type": "string",
+            "enum": [
+              "visible",
+              "retained",
+              "deleted"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "reason",
+          "status",
+          "observation",
+          "createdAt",
+          "postId",
+          "groupId",
+          "title",
+          "content",
+          "type",
+          "targetId",
+          "contentStatus"
+        ],
+        "additionalProperties": false
+      },
+      "ReportPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Report"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "ResolveReport": {
+        "type": "object",
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "desestimado",
+              "contenido_retirado",
+              "usuario_suspendido"
+            ]
+          },
+          "observation": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 1000
+          },
+          "suspensionDays": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 90
+          }
+        },
+        "required": [
+          "decision",
+          "observation"
+        ],
+        "additionalProperties": false
+      },
+      "Retained": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "post",
+              "comment"
+            ]
+          },
+          "postId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+          },
+          "title": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1,
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "postId",
+          "title",
+          "content",
+          "version"
+        ],
+        "additionalProperties": false
+      },
+      "RetainedPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Retained"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "Review": {
+        "type": "object",
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "publish",
+              "remove"
+            ]
+          },
+          "observation": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 1000
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "decision"
+        ],
+        "additionalProperties": false
+      },
+      "Notification": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "comentario",
+              "respuesta",
+              "publicacion_grupo",
+              "resultado_reporte",
+              "contenido_retirado",
+              "nuevo_reporte"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "href": {
+            "type": "string",
+            "pattern": "^/(publicaciones/[1-9][0-9]*|moderacion|grupos/[1-9][0-9]*/moderacion)$",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "readAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "message",
+          "href",
+          "createdAt",
+          "readAt"
+        ],
+        "additionalProperties": false
+      },
+      "NotificationPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Notification"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "unreadCount": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "unreadCount"
+        ],
+        "additionalProperties": false
+      },
+      "Count": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "count"
+        ],
+        "additionalProperties": false
+      },
+      "ReadThrough": {
+        "type": "object",
+        "properties": {
+          "throughId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+          }
+        },
+        "required": [
+          "throughId"
+        ],
+        "additionalProperties": false
+      },
+      "Summary": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "integer",
+            "enum": [
+              7,
+              30
+            ]
+          },
+          "users": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "suspended": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "posts": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "comments": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "reports": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "groups": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "days",
+          "users",
+          "suspended",
+          "posts",
+          "comments",
+          "reports",
+          "groups"
+        ],
+        "additionalProperties": false
+      },
+      "AdminUser": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+          },
+          "firstName": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "administrator"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "suspended"
+            ]
+          },
+          "suspendedUntil": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "firstName",
+          "lastName",
+          "role",
+          "status",
+          "suspendedUntil"
+        ],
+        "additionalProperties": false
+      },
+      "AdminUserPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminUser"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "AdminPost": {
+        "type": "object",
+        "properties": {
+          "postId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "visible",
+              "retained",
+              "deleted"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "groupId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number.",
+            "nullable": true
+          },
+          "authorId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "Decimal bigint positivo, máximo 9223372036854775807 (validado en servidor). Nunca convertir salidas a Number."
+          }
+        },
+        "required": [
+          "postId",
+          "title",
+          "status",
+          "version",
+          "groupId",
+          "authorId"
+        ],
+        "additionalProperties": false
+      },
+      "AdminPostPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminPost"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "Suspension": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 90
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "days",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "integer",
+            "minimum": 400,
+            "maximum": 599
+          },
+          "error": {
+            "type": "string"
+          },
+          "message": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ]
+          },
+          "correlationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "path": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "statusCode",
+          "error",
+          "message",
+          "correlationId",
+          "path",
+          "timestamp"
+        ],
+        "additionalProperties": false
+      }
+    }
+  }
+}

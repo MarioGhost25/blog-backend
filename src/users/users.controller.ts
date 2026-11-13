@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   Param,
   Patch,
   Put,
@@ -30,6 +31,8 @@ export class UsersController {
   constructor(private readonly service: UsersService) {}
 
   @Get('me')
+  @Header('Cache-Control', 'private, no-store')
+  @Header('Vary', 'Cookie')
   getMyProfile(@CurrentUser() user: AuthenticatedUser) {
     return this.service.getMyProfile(user.id);
   }
@@ -57,6 +60,8 @@ export class UsersController {
   }
 
   @Get('me/posts')
+  @Header('Cache-Control', 'private, no-store')
+  @Header('Vary', 'Cookie')
   getMyPosts(
     @CurrentUser() user: AuthenticatedUser,
     @Query() query: FilterMyPostsDto,

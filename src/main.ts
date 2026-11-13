@@ -4,6 +4,7 @@ import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { createApiValidationPipe } from './common/validation/api-validation.pipe';
+import { configureHttpSecurity } from './common/security/http-security';
 
 Object.defineProperty(BigInt.prototype, 'toJSON', {
   configurable: true,
@@ -15,6 +16,7 @@ Object.defineProperty(BigInt.prototype, 'toJSON', {
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
+  configureHttpSecurity(app);
   app.setGlobalPrefix('api/v1');
   app.enableShutdownHooks();
   app.use(helmet());
@@ -32,7 +34,11 @@ async function bootstrap(): Promise<void> {
       `Listening on port ${port} (PID ${process.pid})`,
     );
   } catch (error: unknown) {
-    await app.close();
+    await app.close().catch(() => {
+      new Logger('Bootstrap').error(
+        'Application cleanup failed after startup error',
+      );
+    });
     throw error;
   }
 }

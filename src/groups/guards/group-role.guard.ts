@@ -5,7 +5,7 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { RolGlobal, RolGrupo } from '@prisma/client';
+import { RolGrupo } from '@prisma/client';
 import type { AuthenticatedUser } from '../../auth/types/auth.types';
 import { GroupsRepository } from '../groups.repository';
 import { GROUP_ROLES } from '../decorators/group-roles.decorator';
@@ -30,7 +30,6 @@ export class GroupRoleGuard implements CanActivate {
     const groupId = parseGroupId(request.params.id);
     if (!request.user)
       throw new ForbiddenException('An authenticated session is required');
-    if (request.user.role === RolGlobal.administrador) return true;
     const membership = await this.repository.findMembership(
       groupId,
       request.user.id,

@@ -1,0 +1,1517 @@
+{
+  "provenance": "Synthetic isolated PostgreSQL + real Nest HTTP responses. No credentials or headers.",
+  "responses": [
+    {
+      "method": "get",
+      "path": "/groups/{id}",
+      "status": 200,
+      "body": {
+        "groupId": "1",
+        "categoryId": "1",
+        "creatorId": "1",
+        "name": "Group Alpha",
+        "description": null,
+        "createdAt": "2026-11-11T02:29:29.466Z",
+        "category": {
+          "categoryId": "1",
+          "name": "Cálculo I",
+          "description": "Límites, derivadas e integrales de una variable."
+        },
+        "_count": {
+          "members": 6
+        },
+        "myRole": "administrator",
+        "administrators": [
+          {
+            "userId": "1",
+            "name": "Person1",
+            "lastName": "Synthetic",
+            "photoUrl": null
+          },
+          {
+            "userId": "7",
+            "name": "Person7",
+            "lastName": "Synthetic",
+            "photoUrl": null
+          }
+        ]
+      }
+    },
+    {
+      "method": "get",
+      "path": "/groups/{id}/members",
+      "status": 200,
+      "body": {
+        "items": [
+          {
+            "role": "member",
+            "joinedAt": "2026-11-11T02:29:29.472Z",
+            "user": {
+              "userId": "9",
+              "name": "Person9",
+              "lastName": "Synthetic",
+              "major": null,
+              "photoUrl": null
+            }
+          },
+          {
+            "role": "administrator",
+            "joinedAt": "2026-11-11T02:29:29.472Z",
+            "user": {
+              "userId": "7",
+              "name": "Person7",
+              "lastName": "Synthetic",
+              "major": null,
+              "photoUrl": null
+            }
+          },
+          {
+            "role": "moderator",
+            "joinedAt": "2026-11-11T02:29:29.472Z",
+            "user": {
+              "userId": "4",
+              "name": "Person4",
+              "lastName": "Synthetic",
+              "major": null,
+              "photoUrl": null
+            }
+          },
+          {
+            "role": "member",
+            "joinedAt": "2026-11-11T02:29:29.472Z",
+            "user": {
+              "userId": "3",
+              "name": "Person3",
+              "lastName": "Synthetic",
+              "major": null,
+              "photoUrl": null
+            }
+          },
+          {
+            "role": "member",
+            "joinedAt": "2026-11-11T02:29:29.472Z",
+            "user": {
+              "userId": "2",
+              "name": "Person2",
+              "lastName": "Synthetic",
+              "major": null,
+              "photoUrl": null
+            }
+          },
+          {
+            "role": "administrator",
+            "joinedAt": "2026-11-11T02:29:29.472Z",
+            "user": {
+              "userId": "1",
+              "name": "Person1",
+              "lastName": "Synthetic",
+              "major": null,
+              "photoUrl": null
+            }
+          }
+        ],
+        "nextCursor": null
+      }
+    },
+    {
+      "method": "get",
+      "path": "/posts/group/{groupId}",
+      "status": 200,
+      "body": {
+        "items": [
+          {
+            "id": "1",
+            "authorId": "2",
+            "categoryId": "1",
+            "groupId": "1",
+            "title": "GROUP_SECRET_ALPHA",
+            "content": "<p>GROUP_SECRET_ALPHA</p>",
+            "status": "visible",
+            "version": 1,
+            "createdAt": "2026-11-11T02:29:29.476Z",
+            "updatedAt": null,
+            "author": {
+              "id": "2",
+              "firstName": "Person2",
+              "lastName": "Synthetic",
+              "photoUrl": null
+            },
+            "category": {
+              "id": "1",
+              "name": "Cálculo I",
+              "description": "Límites, derivadas e integrales de una variable."
+            },
+            "group": {
+              "id": "1",
+              "name": "Group Alpha"
+            },
+            "attachments": [
+              {
+                "id": "1",
+                "postId": "1",
+                "type": "image",
+                "title": "Group image",
+                "url": "/api/v1/posts/1/attachments/1/content",
+                "order": 1
+              },
+              {
+                "id": "2",
+                "postId": "1",
+                "type": "link",
+                "title": "Group link",
+                "url": "https://example.test/resource",
+                "order": 2
+              }
+            ],
+            "commentCount": 0
+          }
+        ],
+        "nextCursor": null
+      }
+    },
+    {
+      "method": "get",
+      "path": "/posts/{id}",
+      "status": 200,
+      "body": {
+        "id": "1",
+        "authorId": "2",
+        "categoryId": "1",
+        "groupId": "1",
+        "title": "GROUP_SECRET_ALPHA",
+        "content": "<p>GROUP_SECRET_ALPHA</p>",
+        "status": "visible",
+        "version": 1,
+        "createdAt": "2026-11-11T02:29:29.476Z",
+        "updatedAt": null,
+        "author": {
+          "id": "2",
+          "firstName": "Person2",
+          "lastName": "Synthetic",
+          "photoUrl": null
+        },
+        "category": {
+          "id": "1",
+          "name": "Cálculo I",
+          "description": "Límites, derivadas e integrales de una variable."
+        },
+        "group": {
+          "id": "1",
+          "name": "Group Alpha"
+        },
+        "attachments": [
+          {
+            "id": "1",
+            "postId": "1",
+            "type": "image",
+            "title": "Group image",
+            "url": "/api/v1/posts/1/attachments/1/content",
+            "order": 1
+          },
+          {
+            "id": "2",
+            "postId": "1",
+            "type": "link",
+            "title": "Group link",
+            "url": "https://example.test/resource",
+            "order": 2
+          }
+        ],
+        "commentCount": 0,
+        "permissions": {
+          "edit": false,
+          "moderate": true
+        }
+      }
+    },
+    {
+      "method": "post",
+      "path": "/posts",
+      "status": 201,
+      "body": {
+        "id": "6",
+        "authorId": "1",
+        "categoryId": "1",
+        "groupId": "1",
+        "title": "Group contribution",
+        "content": "<p>Text</p>",
+        "status": "visible",
+        "version": 1,
+        "createdAt": "2026-11-11T02:29:29.657Z",
+        "updatedAt": null,
+        "author": {
+          "id": "1",
+          "firstName": "Person1",
+          "lastName": "Synthetic",
+          "photoUrl": null
+        },
+        "category": {
+          "id": "1",
+          "name": "Cálculo I",
+          "description": "Límites, derivadas e integrales de una variable."
+        },
+        "group": {
+          "id": "1",
+          "name": "Group Alpha"
+        },
+        "attachments": [],
+        "commentCount": 0
+      }
+    },
+    {
+      "method": "patch",
+      "path": "/posts/{id}",
+      "status": 403,
+      "body": {
+        "statusCode": 403,
+        "error": "Forbidden",
+        "message": "Only the author can modify this post",
+        "correlationId": "4c37d187-ce00-4d6c-97b6-d1a745c5433d",
+        "path": "/api/v1/posts/:id",
+        "timestamp": "2026-11-11T02:29:29.690Z"
+      }
+    },
+    {
+      "method": "patch",
+      "path": "/posts/{id}/attachments/order",
+      "status": 403,
+      "body": {
+        "statusCode": 403,
+        "error": "Forbidden",
+        "message": "Only the author can modify this post",
+        "correlationId": "b8a9777b-1bfb-4dc8-ad9c-e351818f378b",
+        "path": "/api/v1/posts/:id/attachments/order",
+        "timestamp": "2026-11-11T02:29:29.709Z"
+      }
+    },
+    {
+      "method": "delete",
+      "path": "/posts/{id}/attachments/{attachmentId}",
+      "status": 403,
+      "body": {
+        "statusCode": 403,
+        "error": "Forbidden",
+        "message": "Only the author can modify this post",
+        "correlationId": "68ff2dc8-7bdc-4f25-8d94-ccf51e8ef561",
+        "path": "/api/v1/posts/:id/attachments/:attachmentId",
+        "timestamp": "2026-11-11T02:29:29.731Z"
+      }
+    },
+    {
+      "method": "post",
+      "path": "/posts/{id}/attachments",
+      "status": 403,
+      "body": {
+        "statusCode": 403,
+        "error": "Forbidden",
+        "message": "Only the author can modify this post",
+        "correlationId": "7eceaccc-be39-4429-b9b5-0685da6fb6b8",
+        "path": "/api/v1/posts/:id/attachments",
+        "timestamp": "2026-11-11T02:29:29.751Z"
+      }
+    },
+    {
+      "method": "patch",
+      "path": "/groups/{id}/members/{userId}",
+      "status": 200,
+      "body": {
+        "groupId": "1",
+        "userId": "3",
+        "role": "moderator",
+        "joinedAt": "2026-11-11T02:29:29.472Z"
+      }
+    },
+    {
+      "method": "delete",
+      "path": "/groups/{id}/members/{userId}",
+      "status": 204,
+      "body": {}
+    },
+    {
+      "method": "delete",
+      "path": "/posts/{id}",
+      "status": 204,
+      "body": {}
+    },
+    {
+      "method": "patch",
+      "path": "/posts/{id}",
+      "status": 200,
+      "body": {
+        "id": "1",
+        "authorId": "2",
+        "categoryId": "1",
+        "groupId": "1",
+        "title": "Author edit",
+        "content": "<p>GROUP_SECRET_ALPHA</p>",
+        "status": "visible",
+        "version": 2,
+        "createdAt": "2026-11-11T02:29:29.825Z",
+        "updatedAt": "2026-11-11T02:29:29.927Z",
+        "author": {
+          "id": "2",
+          "firstName": "Person2",
+          "lastName": "Synthetic",
+          "photoUrl": null
+        },
+        "category": {
+          "id": "1",
+          "name": "Cálculo I",
+          "description": "Límites, derivadas e integrales de una variable."
+        },
+        "group": {
+          "id": "1",
+          "name": "Group Alpha"
+        },
+        "attachments": [
+          {
+            "id": "1",
+            "postId": "1",
+            "type": "image",
+            "title": "Group image",
+            "url": "/api/v1/posts/1/attachments/1/content",
+            "order": 1
+          },
+          {
+            "id": "2",
+            "postId": "1",
+            "type": "link",
+            "title": "Group link",
+            "url": "https://example.test/resource",
+            "order": 2
+          }
+        ],
+        "commentCount": 0
+      }
+    },
+    {
+      "method": "patch",
+      "path": "/posts/{id}/attachments/order",
+      "status": 200,
+      "body": [
+        {
+          "id": "2",
+          "postId": "1",
+          "type": "link",
+          "title": "Group link",
+          "url": "https://example.test/resource",
+          "order": 1
+        },
+        {
+          "id": "1",
+          "postId": "1",
+          "type": "image",
+          "title": "Group image",
+          "url": "https://assets.example.test/group.png",
+          "order": 2
+        }
+      ]
+    },
+    {
+      "method": "delete",
+      "path": "/posts/{id}/attachments/{attachmentId}",
+      "status": 204,
+      "body": {}
+    },
+    {
+      "method": "post",
+      "path": "/posts/{id}/attachments",
+      "status": 201,
+      "body": {
+        "id": "4",
+        "postId": "1",
+        "type": "link",
+        "title": "Added link",
+        "url": "https://example.test/new",
+        "order": 2
+      }
+    },
+    {
+      "method": "patch",
+      "path": "/groups/{id}/members/{userId}",
+      "status": 403,
+      "body": {
+        "statusCode": 403,
+        "error": "Forbidden",
+        "message": "Your membership in this group does not grant the required role",
+        "correlationId": "ae095c78-787a-4333-a3ed-dab3a20d18d7",
+        "path": "/api/v1/groups/:id/members/:userId",
+        "timestamp": "2026-11-11T02:29:30.012Z"
+      }
+    },
+    {
+      "method": "delete",
+      "path": "/groups/{id}/members/{userId}",
+      "status": 403,
+      "body": {
+        "statusCode": 403,
+        "error": "Forbidden",
+        "message": "Your membership in this group does not grant the required role",
+        "correlationId": "2a637951-ca61-41aa-9e0e-83032cd97d63",
+        "path": "/api/v1/groups/:id/members/:userId",
+        "timestamp": "2026-11-11T02:29:30.018Z"
+      }
+    },
+    {
+      "method": "get",
+      "path": "/posts/{id}",
+      "status": 403,
+      "body": {
+        "statusCode": 403,
+        "error": "Forbidden",
+        "message": "You cannot view this retained post",
+        "correlationId": "d0f31d06-ee44-4f45-8a88-73b03700bae7",
+        "path": "/api/v1/posts/:id",
+        "timestamp": "2026-11-11T02:29:30.109Z"
+      }
+    },
+    {
+      "method": "delete",
+      "path": "/posts/{id}",
+      "status": 403,
+      "body": {
+        "statusCode": 403,
+        "error": "Forbidden",
+        "message": "You cannot delete this post",
+        "correlationId": "8b57131e-7542-4c77-8983-a43c111d1aca",
+        "path": "/api/v1/posts/:id",
+        "timestamp": "2026-11-11T02:29:30.194Z"
+      }
+    },
+    {
+      "method": "get",
+      "path": "/groups/{id}/members",
+      "status": 403,
+      "body": {
+        "statusCode": 403,
+        "error": "Forbidden",
+        "message": "Your membership in this group does not grant the required role",
+        "correlationId": "987769e5-3595-40ac-8fb7-20111ec12d96",
+        "path": "/api/v1/groups/:id/members",
+        "timestamp": "2026-11-11T02:29:30.407Z"
+      }
+    },
+    {
+      "method": "get",
+      "path": "/posts/group/{groupId}",
+      "status": 403,
+      "body": {
+        "statusCode": 403,
+        "error": "Forbidden",
+        "message": "Group membership is required",
+        "correlationId": "3146a45e-7231-4392-9576-262d98e9663d",
+        "path": "/api/v1/posts/group/:groupId",
+        "timestamp": "2026-11-11T02:29:30.414Z"
+      }
+    },
+    {
+      "method": "post",
+      "path": "/posts",
+      "status": 403,
+      "body": {
+        "statusCode": 403,
+        "error": "Forbidden",
+        "message": "Group membership is required",
+        "correlationId": "81d01a9e-8ea1-4c39-b811-4402e3653d08",
+        "path": "/api/v1/posts",
+        "timestamp": "2026-11-11T02:29:30.443Z"
+      }
+    },
+    {
+      "method": "get",
+      "path": "/categories",
+      "status": 200,
+      "body": [
+        {
+          "categoryId": "3",
+          "name": "Bases de Datos",
+          "description": "Modelado relacional, SQL y gestión de datos."
+        },
+        {
+          "categoryId": "1",
+          "name": "Cálculo I",
+          "description": "Límites, derivadas e integrales de una variable."
+        },
+        {
+          "categoryId": "5",
+          "name": "Estadística",
+          "description": "Probabilidad, análisis de datos e inferencia estadística."
+        },
+        {
+          "categoryId": "4",
+          "name": "Física General",
+          "description": "Fundamentos de mecánica, energía y movimiento."
+        },
+        {
+          "categoryId": "6",
+          "name": "Ingeniería de Software",
+          "description": "Diseño, desarrollo y calidad de sistemas de software."
+        },
+        {
+          "categoryId": "2",
+          "name": "Programación II",
+          "description": "Programación orientada a objetos y estructuras de datos."
+        },
+        {
+          "categoryId": "7",
+          "name": "Synthetic category",
+          "description": null
+        }
+      ]
+    },
+    {
+      "method": "get",
+      "path": "/groups",
+      "status": 200,
+      "body": {
+        "items": [
+          {
+            "groupId": "2",
+            "categoryId": "1",
+            "creatorId": "8",
+            "name": "Group Beta",
+            "description": null,
+            "createdAt": "2026-11-11T02:29:30.963Z",
+            "category": {
+              "categoryId": "1",
+              "name": "Cálculo I",
+              "description": "Límites, derivadas e integrales de una variable."
+            },
+            "_count": {
+              "members": 1
+            },
+            "myRole": null
+          },
+          {
+            "groupId": "1",
+            "categoryId": "1",
+            "creatorId": "1",
+            "name": "Group Alpha",
+            "description": null,
+            "createdAt": "2026-11-11T02:29:30.962Z",
+            "category": {
+              "categoryId": "1",
+              "name": "Cálculo I",
+              "description": "Límites, derivadas e integrales de una variable."
+            },
+            "_count": {
+              "members": 6
+            },
+            "myRole": "member"
+          }
+        ],
+        "nextCursor": null
+      }
+    },
+    {
+      "method": "post",
+      "path": "/reports",
+      "status": 201,
+      "body": {
+        "id": "1",
+        "status": "pendiente"
+      }
+    },
+    {
+      "method": "get",
+      "path": "/moderation/reports/{id}",
+      "status": 200,
+      "body": {
+        "id": "1",
+        "reason": "Synthetic contract report",
+        "status": "pendiente",
+        "observation": null,
+        "createdAt": "2026-11-11T02:29:31.011Z",
+        "postId": "1",
+        "groupId": "1",
+        "title": "GROUP_SECRET_ALPHA",
+        "content": "<p>GROUP_SECRET_ALPHA</p>",
+        "type": "post",
+        "targetId": "1",
+        "contentStatus": "visible"
+      }
+    },
+    {
+      "method": "get",
+      "path": "/posts/operations/{key}",
+      "status": 200,
+      "body": {
+        "status": "unknown"
+      }
+    },
+    {
+      "method": "get",
+      "path": "/groups",
+      "status": 401,
+      "body": {
+        "statusCode": 401,
+        "error": "Unauthorized",
+        "message": "Unauthorized",
+        "correlationId": "5ed57684-3720-4b5b-b79c-a9586a25a26f",
+        "path": "/api/v1/groups",
+        "timestamp": "2026-11-11T02:29:31.100Z"
+      }
+    },
+    {
+      "method": "get",
+      "path": "/groups/{id}/members",
+      "status": 401,
+      "body": {
+        "statusCode": 401,
+        "error": "Unauthorized",
+        "message": "Unauthorized",
+        "correlationId": "42954a3e-61cf-4b70-91a3-394844c0c03a",
+        "path": "/api/v1/groups/:id/members",
+        "timestamp": "2026-11-11T02:29:31.102Z"
+      }
+    },
+    {
+      "method": "get",
+      "path": "/posts/group/{groupId}",
+      "status": 401,
+      "body": {
+        "statusCode": 401,
+        "error": "Unauthorized",
+        "message": "Unauthorized",
+        "correlationId": "ce223b55-ad53-4f36-85c5-751c2bc69313",
+        "path": "/api/v1/posts/group/:groupId",
+        "timestamp": "2026-11-11T02:29:31.104Z"
+      }
+    },
+    {
+      "method": "get",
+      "path": "/users/me/posts",
+      "status": 200,
+      "body": {
+        "items": [
+          {
+            "postId": "5",
+            "authorId": "2",
+            "categoryId": "1",
+            "groupId": null,
+            "title": "PUBLIC_HELD",
+            "content": "<p>PUBLIC_HELD</p>",
+            "status": "held",
+            "version": 1,
+            "createdAt": "2026-11-11T02:29:31.236Z",
+            "updatedAt": null,
+            "category": {
+              "categoryId": "1",
+              "name": "Cálculo I",
+              "description": "Límites, derivadas e integrales de una variable."
+            },
+            "_count": {
+              "comments": 0,
+              "attachments": 0
+            }
+          },
+          {
+            "postId": "4",
+            "authorId": "2",
+            "categoryId": "1",
+            "groupId": null,
+            "title": "PUBLIC_CONTENT",
+            "content": "<p>PUBLIC_CONTENT</p>",
+            "status": "visible",
+            "version": 1,
+            "createdAt": "2026-11-11T02:29:31.235Z",
+            "updatedAt": null,
+            "category": {
+              "categoryId": "1",
+              "name": "Cálculo I",
+              "description": "Límites, derivadas e integrales de una variable."
+            },
+            "_count": {
+              "comments": 0,
+              "attachments": 0
+            }
+          }
+        ],
+        "nextCursor": null
+      }
+    },
+    {
+      "method": "post",
+      "path": "/groups/{id}/members",
+      "status": 201,
+      "body": {
+        "groupId": "1",
+        "userId": "2",
+        "role": "member",
+        "joinedAt": "2026-11-11T02:29:31.351Z"
+      }
+    },
+    {
+      "method": "delete",
+      "path": "/groups/{id}/members/me",
+      "status": 204,
+      "body": {}
+    },
+    {
+      "method": "get",
+      "path": "/posts",
+      "status": 200,
+      "body": {
+        "items": [
+          {
+            "id": "4",
+            "authorId": "2",
+            "categoryId": "1",
+            "groupId": null,
+            "title": "PUBLIC_CONTENT",
+            "content": "<p>PUBLIC_CONTENT</p>",
+            "status": "visible",
+            "version": 1,
+            "createdAt": "2026-11-11T02:29:31.525Z",
+            "updatedAt": null,
+            "author": {
+              "id": "2",
+              "firstName": "Person2",
+              "lastName": "Synthetic",
+              "photoUrl": null
+            },
+            "category": {
+              "id": "1",
+              "name": "Cálculo I",
+              "description": "Límites, derivadas e integrales de una variable."
+            },
+            "group": null,
+            "attachments": [],
+            "commentCount": 0
+          }
+        ],
+        "nextCursor": null
+      }
+    },
+    {
+      "method": "get",
+      "path": "/posts/search",
+      "status": 200,
+      "body": {
+        "items": [],
+        "nextCursor": null
+      }
+    },
+    {
+      "method": "delete",
+      "path": "/posts/{id}/attachments/{attachmentId}",
+      "status": 404,
+      "body": {
+        "statusCode": 404,
+        "error": "NotFound",
+        "message": "Attachment not found",
+        "correlationId": "70ba13ab-a036-4659-9819-610010027675",
+        "path": "/api/v1/posts/:id/attachments/:attachmentId",
+        "timestamp": "2026-11-11T02:29:31.588Z"
+      }
+    },
+    {
+      "method": "post",
+      "path": "/groups/{id}/members",
+      "status": 409,
+      "body": {
+        "statusCode": 409,
+        "error": "Conflict",
+        "message": "You are already a member of this group",
+        "correlationId": "f71d9d1c-a62c-44a2-937c-40e7fa578cfb",
+        "path": "/api/v1/groups/:id/members",
+        "timestamp": "2026-11-11T02:29:31.633Z"
+      }
+    },
+    {
+      "method": "delete",
+      "path": "/groups/{id}/members/me",
+      "status": 409,
+      "body": {
+        "statusCode": 409,
+        "error": "Conflict",
+        "message": "You are the only administrator; transfer administration before leaving",
+        "correlationId": "43a605ff-5e7c-461c-9f15-51fce31e022f",
+        "path": "/api/v1/groups/:id/members/me",
+        "timestamp": "2026-11-11T02:29:31.676Z"
+      }
+    },
+    {
+      "method": "patch",
+      "path": "/groups/{id}/members/{userId}",
+      "status": 409,
+      "body": {
+        "statusCode": 409,
+        "error": "Conflict",
+        "message": "The group must have at least one administrator",
+        "correlationId": "0c8ae334-5aa8-4e55-82b3-f7dac0c59d13",
+        "path": "/api/v1/groups/:id/members/:userId",
+        "timestamp": "2026-11-11T02:29:31.721Z"
+      }
+    },
+    {
+      "method": "post",
+      "path": "/groups/{id}/transfer",
+      "status": 204,
+      "body": {}
+    },
+    {
+      "method": "post",
+      "path": "/groups/{id}/transfer",
+      "status": 403,
+      "body": {
+        "statusCode": 403,
+        "error": "Forbidden",
+        "message": "Your membership in this group does not grant the required role",
+        "correlationId": "c6886df2-0f74-4d06-803b-909eccf5789e",
+        "path": "/api/v1/groups/:id/transfer",
+        "timestamp": "2026-11-11T02:29:31.888Z"
+      }
+    },
+    {
+      "method": "post",
+      "path": "/groups/{id}/transfer",
+      "status": 400,
+      "body": {
+        "statusCode": 400,
+        "error": "ValidationError",
+        "message": "You cannot transfer administration to yourself",
+        "correlationId": "25034637-7823-43c8-a094-5c9fc2faeaf9",
+        "path": "/api/v1/groups/:id/transfer",
+        "timestamp": "2026-11-11T02:29:31.902Z"
+      }
+    },
+    {
+      "method": "get",
+      "path": "/posts/{id}/attachments/{attachmentId}/content",
+      "status": 403,
+      "body": {
+        "statusCode": 403,
+        "error": "Forbidden",
+        "message": "Group membership is required",
+        "correlationId": "6509fa5f-f0da-4823-a9b2-7c2f4bdf90d5",
+        "path": "/api/v1/posts/:id/attachments/:attachmentId/content",
+        "timestamp": "2026-11-11T02:29:32.885Z"
+      }
+    },
+    {
+      "method": "get",
+      "path": "/posts/{id}/attachments/{attachmentId}/content",
+      "status": 404,
+      "body": {
+        "statusCode": 404,
+        "error": "NotFound",
+        "message": "Post not found",
+        "correlationId": "38e46d05-3180-4278-a1d6-9d316e964aa2",
+        "path": "/api/v1/posts/:id/attachments/:attachmentId/content",
+        "timestamp": "2026-11-11T02:29:32.976Z"
+      }
+    },
+    {
+      "method": "get",
+      "path": "/posts/{id}/attachments/{attachmentId}/content",
+      "status": 410,
+      "body": {
+        "statusCode": 410,
+        "error": "Gone",
+        "message": "This legacy resource requires a private storage migration",
+        "correlationId": "3f08ca3f-e0a0-4bb3-82e4-2e261049e949",
+        "path": "/api/v1/posts/:id/attachments/:attachmentId/content",
+        "timestamp": "2026-11-11T02:29:33.104Z"
+      }
+    },
+    {
+      "method": "post",
+      "path": "/posts/{id}/attachments",
+      "status": 415,
+      "body": {
+        "statusCode": 415,
+        "error": "UnsupportedMediaType",
+        "message": "Invalid, damaged or unsupported file",
+        "correlationId": "d0d92df2-3d6b-41a3-8433-7963c11b8257",
+        "path": "/api/v1/posts/:id/attachments",
+        "timestamp": "2026-11-11T02:29:33.139Z"
+      }
+    },
+    {
+      "method": "get",
+      "path": "/users/me/feed",
+      "status": 200,
+      "body": {
+        "items": [
+          {
+            "id": "4",
+            "authorId": "2",
+            "categoryId": "1",
+            "groupId": null,
+            "title": "PUBLIC_CONTENT",
+            "content": "<p>PUBLIC_CONTENT</p>",
+            "status": "visible",
+            "version": 1,
+            "createdAt": "2026-11-11T02:29:33.275Z",
+            "updatedAt": null,
+            "author": {
+              "id": "2",
+              "firstName": "Person2",
+              "lastName": "Synthetic",
+              "photoUrl": null
+            },
+            "category": {
+              "id": "1",
+              "name": "Cálculo I",
+              "description": "Límites, derivadas e integrales de una variable."
+            },
+            "group": null,
+            "attachments": [],
+            "commentCount": 0
+          }
+        ],
+        "nextCursor": "4"
+      }
+    },
+    {
+      "method": "post",
+      "path": "/posts/{id}/comments",
+      "status": 201,
+      "body": {
+        "id": "1",
+        "postId": "1",
+        "author": {
+          "id": "3",
+          "name": "Person3",
+          "lastName": "Synthetic"
+        },
+        "content": "Una duda interesante",
+        "status": "visible",
+        "createdAt": "2026-11-11T02:29:33.449Z",
+        "parent": null
+      }
+    },
+    {
+      "method": "delete",
+      "path": "/comments/{id}",
+      "status": 204,
+      "body": {}
+    },
+    {
+      "method": "get",
+      "path": "/posts/{id}/comments",
+      "status": 200,
+      "body": {
+        "items": [
+          {
+            "id": "2",
+            "postId": "1",
+            "author": {
+              "id": "2",
+              "name": "Person2",
+              "lastName": "Synthetic"
+            },
+            "content": "Respuesta a la duda",
+            "status": "visible",
+            "createdAt": "2026-11-11T02:29:33.480Z",
+            "parent": {
+              "id": "1",
+              "content": null
+            }
+          },
+          {
+            "id": "1",
+            "postId": "1",
+            "author": {
+              "id": "3",
+              "name": "Person3",
+              "lastName": "Synthetic"
+            },
+            "content": null,
+            "status": "eliminado",
+            "createdAt": "2026-11-11T02:29:33.449Z",
+            "parent": null
+          }
+        ],
+        "nextCursor": null
+      }
+    },
+    {
+      "method": "post",
+      "path": "/posts/{id}/comments",
+      "status": 400,
+      "body": {
+        "statusCode": 400,
+        "error": "ValidationError",
+        "message": "The parent must be a visible comment in the same publication",
+        "correlationId": "dd934fec-689d-416b-a80e-97249a5a7057",
+        "path": "/api/v1/posts/:id/comments",
+        "timestamp": "2026-11-11T02:29:33.596Z"
+      }
+    },
+    {
+      "method": "post",
+      "path": "/posts/{id}/comments",
+      "status": 403,
+      "body": {
+        "statusCode": 403,
+        "error": "Forbidden",
+        "message": "Group membership is required",
+        "correlationId": "aedb3c2a-6cb6-4751-8a87-8435b02749d4",
+        "path": "/api/v1/posts/:id/comments",
+        "timestamp": "2026-11-11T02:29:33.608Z"
+      }
+    },
+    {
+      "method": "get",
+      "path": "/moderation/retained",
+      "status": 200,
+      "body": {
+        "items": [
+          {
+            "id": "1",
+            "type": "comment",
+            "postId": "1",
+            "title": "GROUP_SECRET_ALPHA",
+            "content": "Esto es una mierda",
+            "version": null
+          }
+        ],
+        "nextCursor": null
+      }
+    },
+    {
+      "method": "patch",
+      "path": "/moderation/retained/{type}/{id}",
+      "status": 403,
+      "body": {
+        "statusCode": 403,
+        "error": "Forbidden",
+        "message": "Forbidden",
+        "correlationId": "9875cc4f-f75f-4dac-8737-3dd2637b4353",
+        "path": "/api/v1/moderation/retained/:type/:id",
+        "timestamp": "2026-11-11T02:29:33.736Z"
+      }
+    },
+    {
+      "method": "patch",
+      "path": "/moderation/retained/{type}/{id}",
+      "status": 204,
+      "body": {}
+    },
+    {
+      "method": "patch",
+      "path": "/moderation/retained/{type}/{id}",
+      "status": 409,
+      "body": {
+        "statusCode": 409,
+        "error": "Conflict",
+        "message": "Content changed since review",
+        "correlationId": "c0488b09-9297-4409-b7f1-39d1d25bc47c",
+        "path": "/api/v1/moderation/retained/:type/:id",
+        "timestamp": "2026-11-11T02:29:33.763Z"
+      }
+    },
+    {
+      "method": "post",
+      "path": "/posts/{id}/comments",
+      "status": 500,
+      "body": {
+        "statusCode": 500,
+        "error": "InternalError",
+        "message": "An internal error occurred",
+        "correlationId": "d920e6dc-01c4-4023-9233-c880c453741f",
+        "path": "/api/v1/posts/:id/comments",
+        "timestamp": "2026-11-11T02:29:33.899Z"
+      }
+    },
+    {
+      "method": "delete",
+      "path": "/comments/{id}",
+      "status": 400,
+      "body": {
+        "statusCode": 400,
+        "error": "ValidationError",
+        "message": "An observation is required to remove another author content",
+        "correlationId": "8d9cb7b9-2a83-49bd-9faf-34c00f48efd6",
+        "path": "/api/v1/comments/:id",
+        "timestamp": "2026-11-11T02:29:33.964Z"
+      }
+    },
+    {
+      "method": "delete",
+      "path": "/comments/{id}",
+      "status": 403,
+      "body": {
+        "statusCode": 403,
+        "error": "Forbidden",
+        "message": "Group membership is required",
+        "correlationId": "55358b6a-103c-460c-9361-aa19a2673839",
+        "path": "/api/v1/comments/:id",
+        "timestamp": "2026-11-11T02:29:33.978Z"
+      }
+    },
+    {
+      "method": "post",
+      "path": "/reports",
+      "status": 409,
+      "body": {
+        "statusCode": 409,
+        "error": "Conflict",
+        "message": "Already reported",
+        "correlationId": "f26fee37-8600-49e4-9931-cd6f3c500055",
+        "path": "/api/v1/reports",
+        "timestamp": "2026-11-11T02:29:34.062Z"
+      }
+    },
+    {
+      "method": "get",
+      "path": "/notifications",
+      "status": 200,
+      "body": {
+        "items": [
+          {
+            "id": "4",
+            "type": "nuevo_reporte",
+            "message": "Hay un reporte pendiente de revisión.",
+            "href": "/grupos/1/moderacion",
+            "createdAt": "2026-11-11T02:29:34.047Z",
+            "readAt": null
+          }
+        ],
+        "nextCursor": null,
+        "unreadCount": 1
+      }
+    },
+    {
+      "method": "post",
+      "path": "/reports",
+      "status": 403,
+      "body": {
+        "statusCode": 403,
+        "error": "Forbidden",
+        "message": "Forbidden",
+        "correlationId": "48564f2f-3c91-408b-a60a-4b1dbc750434",
+        "path": "/api/v1/reports",
+        "timestamp": "2026-11-11T02:29:34.089Z"
+      }
+    },
+    {
+      "method": "get",
+      "path": "/moderation/reports",
+      "status": 200,
+      "body": {
+        "items": [],
+        "nextCursor": null
+      }
+    },
+    {
+      "method": "patch",
+      "path": "/moderation/reports/{id}",
+      "status": 403,
+      "body": {
+        "statusCode": 403,
+        "error": "Forbidden",
+        "message": "Forbidden",
+        "correlationId": "40808ba2-e8f5-48ce-9adc-9044bbd2c9fb",
+        "path": "/api/v1/moderation/reports/:id",
+        "timestamp": "2026-11-11T02:29:34.118Z"
+      }
+    },
+    {
+      "method": "patch",
+      "path": "/moderation/reports/{id}",
+      "status": 204,
+      "body": {}
+    },
+    {
+      "method": "patch",
+      "path": "/moderation/reports/{id}",
+      "status": 409,
+      "body": {
+        "statusCode": 409,
+        "error": "Conflict",
+        "message": "Report already resolved",
+        "correlationId": "12d68d3a-8d7a-4ffa-9db0-d84108213c01",
+        "path": "/api/v1/moderation/reports/:id",
+        "timestamp": "2026-11-11T02:29:34.147Z"
+      }
+    },
+    {
+      "method": "patch",
+      "path": "/moderation/reports/{id}",
+      "status": 400,
+      "body": {
+        "statusCode": 400,
+        "error": "ValidationError",
+        "message": "Suspension requires another account, 1–90 days and a reason of 5–500 characters",
+        "correlationId": "645f80d5-8409-46ef-ad59-c350c41a8176",
+        "path": "/api/v1/moderation/reports/:id",
+        "timestamp": "2026-11-11T02:29:34.250Z"
+      }
+    },
+    {
+      "method": "post",
+      "path": "/reports",
+      "status": 429,
+      "body": {
+        "statusCode": 429,
+        "error": "RateLimited",
+        "message": "Report limit reached",
+        "correlationId": "cdaaab12-bb72-4a6f-83c1-64a06c57bfaa",
+        "path": "/api/v1/reports",
+        "timestamp": "2026-11-11T02:29:34.349Z"
+      }
+    },
+    {
+      "method": "get",
+      "path": "/admin/summary",
+      "status": 403,
+      "body": {
+        "statusCode": 403,
+        "error": "Forbidden",
+        "message": "Forbidden",
+        "correlationId": "a84083de-866e-418d-a4e9-4187c296c2cc",
+        "path": "/api/v1/admin/summary",
+        "timestamp": "2026-11-11T02:29:34.387Z"
+      }
+    },
+    {
+      "method": "get",
+      "path": "/admin/users",
+      "status": 403,
+      "body": {
+        "statusCode": 403,
+        "error": "Forbidden",
+        "message": "Forbidden",
+        "correlationId": "4605670b-715c-48cc-8c2a-827a5a70cc36",
+        "path": "/api/v1/admin/users",
+        "timestamp": "2026-11-11T02:29:34.392Z"
+      }
+    },
+    {
+      "method": "get",
+      "path": "/admin/posts",
+      "status": 403,
+      "body": {
+        "statusCode": 403,
+        "error": "Forbidden",
+        "message": "Forbidden",
+        "correlationId": "a9003f71-96a6-4eb8-a8c6-fc6a27eed298",
+        "path": "/api/v1/admin/posts",
+        "timestamp": "2026-11-11T02:29:34.396Z"
+      }
+    },
+    {
+      "method": "get",
+      "path": "/admin/summary",
+      "status": 200,
+      "body": {
+        "days": 30,
+        "users": 10,
+        "suspended": 1,
+        "posts": 3,
+        "comments": 0,
+        "reports": 0,
+        "groups": 2
+      }
+    },
+    {
+      "method": "get",
+      "path": "/admin/summary",
+      "status": 400,
+      "body": {
+        "statusCode": 400,
+        "error": "ValidationError",
+        "message": [
+          "days must be one of the following values: 7, 30"
+        ],
+        "correlationId": "b8419fc0-8a30-49f7-aa78-1fd1897f84fd",
+        "path": "/api/v1/admin/summary",
+        "timestamp": "2026-11-11T02:29:34.420Z"
+      }
+    },
+    {
+      "method": "get",
+      "path": "/admin/users",
+      "status": 200,
+      "body": {
+        "items": [
+          {
+            "id_usuario": "9",
+            "nombre": "Person9",
+            "apellido": "Synthetic",
+            "rol": "administrador",
+            "estado": "activo",
+            "suspendido_hasta": null
+          },
+          {
+            "id_usuario": "6",
+            "nombre": "Person6",
+            "apellido": "Synthetic",
+            "rol": "administrador",
+            "estado": "activo",
+            "suspendido_hasta": null
+          }
+        ],
+        "nextCursor": null
+      }
+    },
+    {
+      "method": "get",
+      "path": "/admin/posts",
+      "status": 200,
+      "body": {
+        "items": [
+          {
+            "id_publicacion": "2",
+            "titulo": "GROUP_HELD_SECRET",
+            "estado": "retenido",
+            "version": 1,
+            "id_grupo": "1",
+            "id_autor": "2"
+          }
+        ],
+        "nextCursor": null
+      }
+    },
+    {
+      "method": "patch",
+      "path": "/admin/users/{id}/suspension",
+      "status": 403,
+      "body": {
+        "statusCode": 403,
+        "error": "Forbidden",
+        "message": "Forbidden",
+        "correlationId": "f7fa9c1e-09dc-4212-8f4c-420f06935dee",
+        "path": "/api/v1/admin/users/:id/suspension",
+        "timestamp": "2026-11-11T02:29:34.446Z"
+      }
+    },
+    {
+      "method": "patch",
+      "path": "/admin/users/{id}/suspension",
+      "status": 400,
+      "body": {
+        "statusCode": 400,
+        "error": "ValidationError",
+        "message": "Suspension requires another account, 1–90 days and a reason of 5–500 characters",
+        "correlationId": "10ff284a-55c1-4d44-97e4-0c5e271f473c",
+        "path": "/api/v1/admin/users/:id/suspension",
+        "timestamp": "2026-11-11T02:29:34.451Z"
+      }
+    },
+    {
+      "method": "patch",
+      "path": "/admin/users/{id}/suspension",
+      "status": 204,
+      "body": {}
+    },
+    {
+      "method": "delete",
+      "path": "/admin/users/{id}/suspension",
+      "status": 204,
+      "body": {}
+    },
+    {
+      "method": "patch",
+      "path": "/notifications/{id}/read",
+      "status": 404,
+      "body": {
+        "statusCode": 404,
+        "error": "NotFound",
+        "message": "Not Found",
+        "correlationId": "15ad961c-53b1-44f2-9636-eea38dde9f36",
+        "path": "/api/v1/notifications/:id/read",
+        "timestamp": "2026-11-11T02:29:34.607Z"
+      }
+    },
+    {
+      "method": "patch",
+      "path": "/notifications/read",
+      "status": 204,
+      "body": {}
+    },
+    {
+      "method": "get",
+      "path": "/notifications/unread/count",
+      "status": 200,
+      "body": {
+        "count": 0
+      }
+    },
+    {
+      "method": "post",
+      "path": "/groups",
+      "status": 400,
+      "body": {
+        "statusCode": 400,
+        "error": "ValidationError",
+        "message": [
+          "name must be longer than or equal to 3 characters"
+        ],
+        "correlationId": "1aa75ccd-5cb9-47a2-823a-99a4bc7d3749",
+        "path": "/api/v1/groups",
+        "timestamp": "2026-11-11T02:29:35.301Z"
+      }
+    },
+    {
+      "method": "post",
+      "path": "/groups",
+      "status": 201,
+      "body": {
+        "groupId": "3",
+        "categoryId": "1",
+        "creatorId": "5",
+        "name": "José Estudio",
+        "description": null,
+        "createdAt": "2026-11-11T02:29:35.308Z",
+        "category": {
+          "categoryId": "1",
+          "name": "Cálculo I",
+          "description": "Límites, derivadas e integrales de una variable."
+        },
+        "_count": {
+          "members": 1
+        },
+        "myRole": "administrator"
+      }
+    },
+    {
+      "method": "get",
+      "path": "/groups/{id}/members",
+      "status": 400,
+      "body": {
+        "statusCode": 400,
+        "error": "ValidationError",
+        "message": [
+          "q must be shorter than or equal to 254 characters"
+        ],
+        "correlationId": "e2a38257-885d-4369-a3e7-5fabda0cc032",
+        "path": "/api/v1/groups/:id/members",
+        "timestamp": "2026-11-11T02:29:35.545Z"
+      }
+    },
+    {
+      "method": "get",
+      "path": "/groups",
+      "status": 400,
+      "body": {
+        "statusCode": 400,
+        "error": "ValidationError",
+        "message": [
+          "q must be shorter than or equal to 254 characters"
+        ],
+        "correlationId": "b1c97263-d007-4d7d-b5aa-f980976ffac8",
+        "path": "/api/v1/groups",
+        "timestamp": "2026-11-11T02:29:35.549Z"
+      }
+    },
+    {
+      "method": "get",
+      "path": "/posts/search",
+      "status": 400,
+      "body": {
+        "statusCode": 400,
+        "error": "ValidationError",
+        "message": [
+          "q must be shorter than or equal to 254 characters"
+        ],
+        "correlationId": "5f4c05eb-f469-40cd-9c58-cd602b106dca",
+        "path": "/api/v1/posts/search",
+        "timestamp": "2026-11-11T02:29:35.551Z"
+      }
+    }
+  ]
+}

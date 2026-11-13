@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { reactivateExpiredAccounts } from './account-suspension';
 
 const userProfileSelect = {
   id_usuario: true,
@@ -50,6 +51,7 @@ export class AuthRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async findById(id: bigint): Promise<UserProfile | null> {
+    await reactivateExpiredAccounts(this.prisma, { id_usuario: id });
     const user = await this.prisma.usuario.findUnique({
       where: { id_usuario: id },
       select: userProfileSelect,
@@ -60,6 +62,7 @@ export class AuthRepository {
   async findByEmail(
     email: string,
   ): Promise<(UserProfile & { passwordHash: string }) | null> {
+    await reactivateExpiredAccounts(this.prisma, { correo: email });
     const user = await this.prisma.usuario.findUnique({
       where: { correo: email },
       select: { ...userProfileSelect, contrasena_hash: true },
@@ -82,24 +85,27 @@ export class AuthRepository {
     return toUserProfile(user);
   }
 
-  async invalidatePreviousTokens(userId: bigint): Promise<void> {
-    await this.prisma.tokenRecuperacion.updateMany({
-      where: { id_usuario: userId, fecha_uso: null },
-      data: { fecha_uso: new Date() },
-    });
-  }
-
   async createRecoveryToken(
     userId: bigint,
     tokenHash: string,
     expiresAt: Date,
   ): Promise<void> {
-    await this.prisma.tokenRecuperacion.create({
-      data: {
-        id_usuario: userId,
-        token_hash: tokenHash,
-        fecha_expiracion: expiresAt,
-      },
+    await this.prisma.$transaction(async (transaction) => {
+      // Serialize issuance for the same account, including concurrent requests.
+      await transaction.$queryRaw`
+        SELECT id_usuario FROM usuario WHERE id_usuario = ${userId} FOR UPDATE
+      `;
+      await transaction.tokenRecuperacion.updateMany({
+        where: { id_usuario: userId, fecha_uso: null },
+        data: { fecha_uso: new Date() },
+      });
+      await transaction.tokenRecuperacion.create({
+        data: {
+          id_usuario: userId,
+          token_hash: tokenHash,
+          fecha_expiracion: expiresAt,
+        },
+      });
     });
   }
 
@@ -118,12 +124,23 @@ export class AuthRepository {
     return token ? { id: token.id_token, userId: token.id_usuario } : null;
   }
 
+  async invalidateRecoveryToken(tokenHash: string): Promise<void> {
+    await this.prisma.tokenRecuperacion.updateMany({
+      where: { token_hash: tokenHash, fecha_uso: null },
+      data: { fecha_uso: new Date() },
+    });
+  }
+
   async consumeRecoveryTokenAndUpdatePassword(
     tokenId: bigint,
     userId: bigint,
     passwordHash: string,
   ): Promise<boolean> {
     return this.prisma.$transaction(async (transaction) => {
+      // Same lock order as issuance: user first, token second.
+      await transaction.$queryRaw`
+        SELECT id_usuario FROM usuario WHERE id_usuario = ${userId} FOR UPDATE
+      `;
       const now = new Date();
       // Claim the token atomically so concurrent requests cannot reuse it.
       const consumed = await transaction.tokenRecuperacion.updateMany({

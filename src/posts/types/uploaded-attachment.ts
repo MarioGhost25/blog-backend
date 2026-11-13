@@ -3,4 +3,5 @@ export interface UploadedAttachment {
   buffer: Buffer;
   mimetype: string;
   size: number;
+  originalname?: string;
 }

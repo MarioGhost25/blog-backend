@@ -1,3 +1,8 @@
+import { AdminModule } from './admin/admin.module';
+import { RealtimeModule } from './realtime/realtime.module';
+import { ModerationModule } from './moderation/moderation.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { CommentsModule } from './comments/comments.module';
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -16,10 +21,15 @@ import { PostsModule } from './posts/posts.module';
       validationSchema: joiValidationSchema,
     }),
     AuthModule,
+    AdminModule,
     CategoriesModule,
     GroupsModule,
     UsersModule,
     PostsModule,
+    CommentsModule,
+    NotificationsModule,
+    ModerationModule,
+    RealtimeModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -14,22 +14,39 @@ const publicProfileSelect = {
   fecha_registro: true,
   _count: {
     select: {
-      publicaciones: { where: { estado: EstadoContenido.visible } },
+      publicaciones: {
+        where: { estado: EstadoContenido.visible, id_grupo: null },
+      },
       membresias_grupo: true,
     },
   },
 } satisfies Prisma.UsuarioSelect;
 
-const profileSelect = {
-  ...publicProfileSelect,
-  correo: true,
-  foto_public_id: true,
-  estado: true,
-  suspendido_hasta: true,
-  motivo_suspension: true,
-  suspendido_por: true,
-  _count: { select: { publicaciones: true, membresias_grupo: true } },
-} satisfies Prisma.UsuarioSelect;
+const accessibleOwnPosts = (authorId: bigint) =>
+  ({
+    id_autor: authorId,
+    OR: [
+      { id_grupo: null },
+      { grupo: { miembros: { some: { id_usuario: authorId } } } },
+    ],
+  }) satisfies Prisma.PublicacionWhereInput;
+
+const profileSelect = (userId: bigint) =>
+  ({
+    ...publicProfileSelect,
+    correo: true,
+    foto_public_id: true,
+    estado: true,
+    suspendido_hasta: true,
+    motivo_suspension: true,
+    suspendido_por: true,
+    _count: {
+      select: {
+        publicaciones: { where: accessibleOwnPosts(userId) },
+        membresias_grupo: true,
+      },
+    },
+  }) satisfies Prisma.UsuarioSelect;
 
 export interface UpdateProfileData {
   firstName?: string;
@@ -46,7 +63,7 @@ export class UsersRepository {
   findProfileById(id: bigint) {
     return this.prisma.usuario.findUnique({
       where: { id_usuario: id },
-      select: profileSelect,
+      select: profileSelect(id),
     });
   }
 
@@ -67,7 +84,7 @@ export class UsersRepository {
         universidad: data.university,
         biografia: data.bio,
       },
-      select: profileSelect,
+      select: profileSelect(id),
     });
   }
 
@@ -75,7 +92,7 @@ export class UsersRepository {
     return this.prisma.usuario.update({
       where: { id_usuario: id },
       data: { foto_url: photoUrl, foto_public_id: photoPublicId },
-      select: profileSelect,
+      select: profileSelect(id),
     });
   }
 
@@ -86,7 +103,10 @@ export class UsersRepository {
     limit = 20,
   ) {
     return this.prisma.publicacion.findMany({
-      where: { id_autor: authorId, ...(status ? { estado: status } : {}) },
+      where: {
+        ...accessibleOwnPosts(authorId),
+        ...(status ? { estado: status } : {}),
+      },
       orderBy: [{ fecha_creacion: 'desc' }, { id_publicacion: 'desc' }],
       ...(cursor !== undefined
         ? { cursor: { id_publicacion: cursor }, skip: 1 }
@@ -94,7 +114,12 @@ export class UsersRepository {
       take: limit + 1,
       include: {
         categoria: true,
-        _count: { select: { comentarios: true, adjuntos: true } },
+        _count: {
+          select: {
+            comentarios: { where: { estado: 'visible' } },
+            adjuntos: true,
+          },
+        },
       },
     });
   }

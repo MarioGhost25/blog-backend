@@ -7,6 +7,7 @@ import {
 import { map, Observable } from 'rxjs';
 import { apiGroupRole } from '../types/group-role';
 import type { RolGrupo } from '@prisma/client';
+import type { Response } from 'express';
 
 const responseKeys: Record<string, string> = {
   id_grupo: 'groupId',
@@ -24,7 +25,6 @@ const responseKeys: Record<string, string> = {
   administradores: 'administrators',
   rol: 'role',
   usuario: 'user',
-  correo: 'email',
   carrera: 'major',
   foto_url: 'photoUrl',
 };
@@ -35,22 +35,24 @@ function jsonSafe(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(jsonSafe);
   if (value && typeof value === 'object')
     return Object.fromEntries(
-      Object.entries(value).map(([key, entry]) => [
-        responseKeys[key] ?? key,
-        (key === 'rol' || key === 'miRol') && typeof entry === 'string'
-          ? apiGroupRole[entry as RolGrupo]
-          : jsonSafe(entry),
-      ]),
+      Object.entries(value)
+        .filter(([key]) => key !== 'correo' && key !== 'email')
+        .map(([key, entry]) => [
+          responseKeys[key] ?? key,
+          (key === 'rol' || key === 'miRol') && typeof entry === 'string'
+            ? apiGroupRole[entry as RolGrupo]
+            : jsonSafe(entry),
+        ]),
     );
   return value;
 }
 
 @Injectable()
 export class GroupsJsonInterceptor implements NestInterceptor {
-  intercept(
-    _context: ExecutionContext,
-    next: CallHandler,
-  ): Observable<unknown> {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
+    const response = context.switchToHttp().getResponse<Response>();
+    response.setHeader('Cache-Control', 'private, no-store');
+    response.vary('Cookie');
     return next.handle().pipe(map(jsonSafe));
   }
 }

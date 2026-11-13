@@ -6,12 +6,16 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { normalizeName } from '../../common/validation/normalize-name';
 
 export class RegisterDto {
+  @Transform(({ value }: { value: unknown }) => normalizeName(value))
   @IsString()
   @Length(2, 80)
   firstName!: string;
 
+  @Transform(({ value }: { value: unknown }) => normalizeName(value))
   @IsString()
   @Length(2, 80)
   lastName!: string;

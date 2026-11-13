@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, RolGlobal, RolGrupo } from '@prisma/client';
+import { Prisma, RolGrupo } from '@prisma/client';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { CategoriesService } from '../categories/categories.service';
 import { GroupsRepository } from './groups.repository';
@@ -94,16 +94,20 @@ export class GroupsService {
     filters: MemberFiltersDto,
     user: AuthenticatedUser,
   ) {
-    return this.repository.withGroupLock(groupId, async (repository) => {
-      if (!(await repository.findMembership(groupId, user.id)))
-        throw new ForbiddenException('You must be a member of this group');
-      return repository.listMembersCursor(
-        groupId,
-        filters.q,
-        filters.cursor == null ? undefined : parseGroupId(filters.cursor),
-        filters.limit,
-      );
-    });
+    return this.repository.withGroupLock(
+      groupId,
+      async (repository) => {
+        if (!(await repository.findMembership(groupId, user.id)))
+          throw new ForbiddenException('You must be a member of this group');
+        return repository.listMembersCursor(
+          groupId,
+          filters.q,
+          filters.cursor == null ? undefined : parseGroupId(filters.cursor),
+          filters.limit,
+        );
+      },
+      'read',
+    );
   }
 
   async changeMemberRole(
@@ -170,12 +174,11 @@ export class GroupsService {
   ): Promise<void> {
     // Recheck after obtaining the lock: the guard's result can become stale.
     if (
-      actor.role !== RolGlobal.administrador &&
       (await repository.findMembership(groupId, actor.id))?.rol !==
-        RolGrupo.administrador
+      RolGrupo.administrador
     )
       throw new ForbiddenException(
-        'You must be a group administrator or global administrator to manage members',
+        'You must currently be an administrator of this group to manage members',
       );
   }
 

@@ -1,7 +1,7 @@
 import {
   BadRequestException,
   Injectable,
-  Logger,
+  GoneException,
   NotFoundException,
   PayloadTooLargeException,
   UnsupportedMediaTypeException,
@@ -15,14 +15,16 @@ import { CreateAttachmentDto } from './dto/create-attachment.dto';
 import { ReorderAttachmentsDto } from './dto/reorder-attachments.dto';
 import { parsePostId } from './utils/post-id';
 import type { UploadedAttachment } from './types/uploaded-attachment';
+import { validateMediaFile } from '../common/validation/media-file';
+import { MediaCleanupService } from './media-cleanup.service';
 
 @Injectable()
 export class AttachmentsService {
-  private readonly logger = new Logger(AttachmentsService.name);
   constructor(
     private readonly posts: PostsService,
     private readonly repository: AttachmentsRepository,
     private readonly storage: AttachmentStorageService,
+    private readonly cleanup: MediaCleanupService,
   ) {}
 
   async addAttachment(
@@ -31,8 +33,9 @@ export class AttachmentsService {
     dto: CreateAttachmentDto,
     file?: UploadedAttachment,
   ) {
+    // Cheap preflight before contacting a provider. The same policy is checked
+    // again under group -> post locks before linking the uploaded asset.
     await this.posts.requireAuthor(postId, user);
-    const order = await this.repository.nextOrder(postId);
     if (dto.type === 'link') {
       if (
         !dto.url ||
@@ -44,14 +47,16 @@ export class AttachmentsService {
       ) {
         throw new BadRequestException('A valid HTTP or HTTPS URL is required');
       }
-      return this.repository.create({
-        postId,
-        type: dto.type,
-        title: dto.title,
-        url: dto.url,
-        cloudinaryPublicId: null,
-        order,
-      });
+      const url = dto.url;
+      return this.withAuthor(postId, user, (repository) =>
+        repository.create({
+          postId,
+          type: dto.type,
+          title: dto.title,
+          url,
+          cloudinaryPublicId: null,
+        }),
+      );
     }
     if (!file) throw new BadRequestException('A file is required');
     if (file.size > 10 * 1024 * 1024 || file.buffer.length > 10 * 1024 * 1024)
@@ -62,26 +67,22 @@ export class AttachmentsService {
       throw new UnsupportedMediaTypeException(
         'The file type does not match the attachment type',
       );
-    const asset = await this.storage.upload(file, dto.type);
-    try {
-      return await this.repository.create({
+    await validateMediaFile(file, dto.type);
+    const publicId = await this.cleanup.begin(dto.type);
+    await this.storage.upload(file, dto.type, publicId);
+    // A pending intent is recoverable even if upload or the commit response is lost.
+    return this.withAuthor(postId, user, async (repository) => {
+      await repository.linkUpload(publicId);
+      return repository.create({
         postId,
         type: dto.type,
         title: dto.title,
-        url: asset.url,
-        cloudinaryPublicId: asset.publicId,
-        order,
+        url: '',
+        cloudinaryPublicId: publicId,
+        delivery: 'authenticated',
+        mime: file.mimetype,
       });
-    } catch (error) {
-      try {
-        await this.storage.delete(asset.publicId, dto.type);
-      } catch {
-        this.logger.error(
-          'Could not clean up an attachment after a database failure',
-        );
-      }
-      throw error;
-    }
+    });
   }
 
   async reorder(
@@ -89,27 +90,68 @@ export class AttachmentsService {
     user: AuthenticatedUser,
     dto: ReorderAttachmentsDto,
   ) {
-    await this.posts.requireAuthor(postId, user);
     const ids = dto.attachmentIds.map(parsePostId);
-    const attachments = await this.repository.findByPostId(postId);
-    if (
-      !ids.length ||
-      ids.length !== attachments.length ||
-      new Set(ids).size !== ids.length ||
-      attachments.some((attachment) => !ids.includes(attachment.id))
-    ) {
-      throw new BadRequestException('Provide every attachment ID exactly once');
-    }
-    return this.repository.reorder(postId, ids);
+    return this.withAuthor(postId, user, (repository) =>
+      repository.reorder(postId, ids),
+    );
   }
 
   async remove(postId: bigint, attachmentId: bigint, user: AuthenticatedUser) {
-    await this.posts.requireAuthor(postId, user);
-    const attachment = await this.repository.findById(attachmentId);
-    if (!attachment || attachment.postId !== postId)
-      throw new NotFoundException('Attachment not found');
+    const attachment = await this.withAuthor(
+      postId,
+      user,
+      async (repository) => {
+        const current = await repository.findById(attachmentId);
+        if (!current || current.postId !== postId)
+          throw new NotFoundException('Attachment not found');
+        return repository.delete(attachmentId);
+      },
+    );
     if (attachment.cloudinaryPublicId)
-      await this.storage.delete(attachment.cloudinaryPublicId, attachment.type);
-    await this.repository.delete(attachmentId);
+      await this.cleanup.cleanup(attachment.cloudinaryPublicId);
+  }
+
+  async content(
+    postId: bigint,
+    attachmentId: bigint,
+    user?: AuthenticatedUser,
+  ) {
+    const post = await this.posts.findOne(postId, user);
+    const attachment = post.attachments.find(
+      (item) => item.id === attachmentId,
+    );
+    if (!attachment || attachment.type === 'link')
+      throw new NotFoundException();
+    if (
+      attachment.delivery !== 'authenticated' ||
+      !attachment.cloudinaryPublicId ||
+      !attachment.mime
+    )
+      throw new GoneException(
+        'This legacy resource requires a private storage migration',
+      );
+    const buffer = await this.storage.read(
+      attachment.cloudinaryPublicId,
+      attachment.type,
+      attachment.mime,
+    );
+    // Revocation/deletion during a slow provider request must take effect too.
+    const current = await this.posts.findOne(postId, user);
+    if (!current.attachments.some((item) => item.id === attachmentId))
+      throw new NotFoundException();
+    return { buffer, mime: attachment.mime, type: attachment.type };
+  }
+
+  private withAuthor<T>(
+    postId: bigint,
+    user: AuthenticatedUser,
+    work: (repository: AttachmentsRepository) => Promise<T>,
+  ) {
+    return this.repository.withPostLock(postId, async (repository, posts) => {
+      await this.posts.withRepository(posts, () =>
+        this.posts.requireAuthor(postId, user),
+      );
+      return work(repository);
+    });
   }
 }

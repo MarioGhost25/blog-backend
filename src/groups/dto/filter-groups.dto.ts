@@ -5,12 +5,18 @@ import {
   IsOptional,
   IsString,
   Max,
+  MaxLength,
   Min,
 } from 'class-validator';
 import { IsGroupId } from '../validators/is-group-id.validator';
+import { normalizeSearch } from '../../common/validation/normalize-name';
 
 export class MemberFiltersDto {
-  @IsOptional() @IsString() q?: string;
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) => normalizeSearch(value))
+  @IsString()
+  @MaxLength(254)
+  q?: string;
   @IsOptional() @IsString() @IsGroupId() cursor?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(50) limit?: number;
 }

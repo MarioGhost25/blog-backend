@@ -146,6 +146,8 @@ model Usuario {
   reportes_realizados Reporte[]           @relation("ReportanteReporte")
   reportes_moderados  Reporte[]           @relation("ModeradorReporte")
   notificaciones      Notificacion[]      @relation("DestinatarioNotificacion")
+  presencias PresenciaSala[]
+  operaciones_publicacion OperacionPublicacion[]
 
   // Índice para reactivación programada de cuentas vencidas (Tabla 24, pág. 79)
   @@index([estado, suspendido_hasta], map: "ix_usuario_suspension")
@@ -205,7 +207,9 @@ model Categoria {
 //   * ck_publicacion_titulo: char_length(titulo) BETWEEN 3 AND 150
 //   * ck_publicacion_version: version >= 1
 // - Columna generada en BD (Tabla 10, pág. 57 | Apéndice A, pág. 166):
-//   * busqueda TSVECTOR GENERATED ALWAYS AS (to_tsvector('spanish', titulo || ' ' || contenido)) STORED
+//   * busqueda: vector STORED español ponderado, mantenido mediante SQL específico.
+//     Migración correctiva: 20261108000100_generated_search. Preservar su columna
+//     generada e índice GIN al preparar futuras migraciones Prisma.
 // - Claves foráneas: Tabla 23 (pág. 77) | Apéndice A (pág. 171)
 // - Índices: Tabla 24 (pág. 79) | Apéndice A (pág. 173)
 // - Esquema Prisma base: Apéndice B (págs. 181-182)
@@ -234,12 +238,30 @@ model Publicacion {
   reportes       Reporte[]
   notificaciones Notificacion[]
 
+  operaciones OperacionPublicacion[]
+
   // Índices B-tree (Tabla 24, pág. 79 | Apéndice B, pág. 182)
   // Nota: El índice GIN ix_publicacion_busqueda sobre "busqueda" se define en el DDL SQL (Apéndice A, pág. 173)
   @@index([id_categoria, estado, fecha_creacion], map: "ix_publicacion_categoria")
   @@index([id_grupo, estado, fecha_creacion], map: "ix_publicacion_grupo")
   @@index([id_autor, fecha_creacion], map: "ix_publicacion_autor")
   @@map("publicacion")
+}
+
+// P03: successful public-author writes and their receipt commit atomically.
+model OperacionPublicacion {
+  id_usuario BigInt
+  clave String @db.Uuid
+  metodo String @db.VarChar(6)
+  huella String @db.Char(64)
+  id_publicacion BigInt
+  version Int
+  fecha_creacion DateTime @default(now()) @db.Timestamptz(6)
+  usuario Usuario @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade, onUpdate: NoAction, map: "fk_operacion_usuario")
+  publicacion Publicacion @relation(fields: [id_publicacion], references: [id_publicacion], onDelete: Restrict, onUpdate: NoAction, map: "fk_operacion_publicacion")
+
+  @@id([id_usuario, clave], map: "pk_operacion_publicacion")
+  @@map("operacion_publicacion")
 }
 
 // ----------------------------------------------------------------------------
@@ -261,6 +283,8 @@ model Adjunto {
   titulo               String      @db.VarChar(150)
   url                  String      @db.VarChar(1024)
   cloudinary_public_id String?     @db.VarChar(255)
+  entrega              String      @default("upload") @db.VarChar(20)
+  mime                 String?     @db.VarChar(100)
   orden                Int         @default(1)
 
   // FK #6: Publicación a la que pertenece el adjunto (Tabla 23, pág. 77 | Apéndice A, pág. 171)
@@ -269,6 +293,21 @@ model Adjunto {
   // Unicidad de posición del adjunto por publicación (Tabla 24, pág. 80 | Apéndice B, pág. 183)
   @@unique([id_publicacion, orden], map: "uq_adjunto_orden")
   @@map("adjunto")
+}
+
+// Durable upload intent and deletion queue. Created BEFORE contacting storage;
+// linking/unlinking is atomic with the attachment transaction.
+model ActivoMultimedia {
+  public_id String @id @db.VarChar(255)
+  tipo String @db.VarChar(20)
+  entrega String @db.VarChar(20)
+  estado String @default("pending") @db.VarChar(20)
+  intentos Int @default(0)
+  siguiente_intento DateTime @db.Timestamptz(6)
+  fecha_creacion DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([estado, siguiente_intento])
+  @@map("activo_multimedia")
 }
 
 // ----------------------------------------------------------------------------
@@ -464,4 +503,28 @@ model Notificacion {
   @@index([id_comentario], map: "ix_notificacion_comentario")
   @@index([id_reporte], map: "ix_notificacion_reporte")
   @@map("notificacion")
+}
+
+// Append-only record of explicit moderation, also for direct withdrawals.
+model RevisionContenido {
+  id_revision BigInt @id @default(autoincrement())
+  tipo String @db.VarChar(20)
+  id_contenido BigInt
+  id_actor BigInt
+  decision String @db.VarChar(30)
+  observacion String? @db.VarChar(1000)
+  fecha_creacion DateTime @default(now()) @db.Timestamptz(6)
+  @@index([tipo, id_contenido])
+  @@map("revision_contenido")
+}
+
+model PresenciaSala {
+  usuario Usuario @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade, onUpdate: NoAction, map: "presencia_sala_id_usuario_fkey")
+  conexion String @db.Uuid
+  sala String @db.VarChar(80)
+  id_usuario BigInt
+  vence DateTime @db.Timestamptz(6)
+  @@id([conexion,sala])
+  @@index([sala,vence])
+  @@map("presencia_sala")
 }

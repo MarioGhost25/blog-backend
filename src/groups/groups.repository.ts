@@ -2,10 +2,10 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
-  NotFoundException,
 } from '@nestjs/common';
 import { Prisma, RolGrupo } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { lockGroup, type ContentLock } from '../common/database/content-locks';
 
 const categorySelect = {
   id_categoria: true,
@@ -16,7 +16,6 @@ const memberUserSelect = {
   id_usuario: true,
   nombre: true,
   apellido: true,
-  correo: true,
   carrera: true,
   foto_url: true,
 } satisfies Prisma.UsuarioSelect;
@@ -73,13 +72,11 @@ export class GroupsRepository {
   async withGroupLock<T>(
     groupId: bigint,
     work: (repository: GroupsRepository) => Promise<T>,
+    mode: ContentLock = 'write',
   ): Promise<T> {
     return this.prisma.$transaction(
       async (tx) => {
-        const rows = await tx.$queryRaw<
-          { id_grupo: bigint }[]
-        >`SELECT id_grupo FROM grupo_estudio WHERE id_grupo = ${groupId} FOR UPDATE`;
-        if (!rows.length) throw new NotFoundException('Group not found');
+        await lockGroup(tx, groupId, mode);
         const scoped = new GroupsRepository(this.prisma);
         scoped.transaction = tx;
         return work(scoped);
@@ -220,7 +217,7 @@ export class GroupsRepository {
         ...(q
           ? {
               usuario: {
-                OR: ['nombre', 'apellido', 'correo'].map((field) => ({
+                OR: ['nombre', 'apellido'].map((field) => ({
                   [field]: { contains: q, mode: 'insensitive' },
                 })),
               },

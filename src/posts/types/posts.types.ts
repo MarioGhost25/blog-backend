@@ -14,5 +14,6 @@ export interface AttachmentWrite {
   title: string;
   url: string;
   cloudinaryPublicId?: string | null;
-  order: number;
+  delivery?: string;
+  mime?: string;
 }
