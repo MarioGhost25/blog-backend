@@ -6,6 +6,7 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
+    "mail:check": "node scripts/check-mail.cjs",
     "build": "prisma generate --config prisma7.config.ts && nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "node scripts/start-nest.cjs start --no-shell",

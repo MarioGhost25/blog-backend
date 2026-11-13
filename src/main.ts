@@ -34,7 +34,11 @@ async function bootstrap(): Promise<void> {
       `Listening on port ${port} (PID ${process.pid})`,
     );
   } catch (error: unknown) {
-    await app.close();
+    await app.close().catch(() => {
+      new Logger('Bootstrap').error(
+        'Application cleanup failed after startup error',
+      );
+    });
     throw error;
   }
 }

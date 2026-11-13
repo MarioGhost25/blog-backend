@@ -1,5 +1,14 @@
 import * as Joi from 'joi';
 
+const recoveryUrl = Joi.string()
+  .uri({ scheme: ['https', 'http'] })
+  .custom((value: string, helpers) => {
+    const url = new URL(value);
+    return url.username || url.password || url.search || url.hash
+      ? helpers.error('any.invalid')
+      : value;
+  });
+
 export const joiValidationSchema = Joi.object({
   PORT: Joi.number().default(2000),
   JWT_SECRET: Joi.string().required(),
@@ -14,20 +23,22 @@ export const joiValidationSchema = Joi.object({
   SMTP_USER: Joi.string(),
   SMTP_PASSWORD: Joi.string(),
   SMTP_FROM: Joi.string().email({ tlds: { allow: false } }),
-  RECOVERY_URL: Joi.string().uri({ scheme: ['https', 'http'] }),
+  MAILER_SERVICE: Joi.string(),
+  MAILER_EMAIL: Joi.string().email({ tlds: { allow: false } }),
+  MAILER_SECRET_KEY: Joi.string(),
+  RECOVERY_URL: recoveryUrl,
 })
-  .and('SMTP_HOST', 'SMTP_FROM', 'RECOVERY_URL')
+  .and('SMTP_HOST', 'SMTP_FROM')
+  .with('SMTP_HOST', 'RECOVERY_URL')
   .and('SMTP_USER', 'SMTP_PASSWORD')
+  .and('MAILER_SERVICE', 'MAILER_EMAIL', 'MAILER_SECRET_KEY')
+  .with('MAILER_SERVICE', 'RECOVERY_URL')
   .when(
     Joi.object({ NODE_ENV: Joi.valid('production').required() }).unknown(),
     {
       then: Joi.object({
         JWT_SECRET: Joi.string().min(32).required(),
-        SMTP_HOST: Joi.required(),
-        SMTP_FROM: Joi.required(),
-        RECOVERY_URL: Joi.string()
-          .uri({ scheme: ['https'] })
-          .required(),
-      }),
+        RECOVERY_URL: recoveryUrl.uri({ scheme: ['https'] }).required(),
+      }).or('MAILER_SERVICE', 'SMTP_HOST'),
     },
   );

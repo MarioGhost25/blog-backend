@@ -2,6 +2,20 @@
 
 ## Configuración SMTP
 
+También se puede usar `MAILER_SERVICE`, `MAILER_EMAIL` y `MAILER_SECRET_KEY`
+en lugar de las variables `SMTP_*`. `MAILER_SERVICE` tiene prioridad y selecciona
+el proveedor de Nodemailer (por ejemplo `gmail`). `RECOVERY_URL` sigue siendo
+obligatoria. Para verificar conexión y autenticación con la configuración real:
+
+```bash
+npm run mail:check
+```
+
+Este comando no envía mensajes ni modifica la base de datos. Para verificar la
+entrega y el restablecimiento, usa `/recuperar` en el frontend con una cuenta
+registrada cuyo buzón controles. Abre el correo, cambia la contraseña y verifica
+el ingreso con la nueva contraseña. HTTP 202 por sí solo no confirma entrega.
+
 El backend usa Nodemailer SMTP. No configura automáticamente un proveedor real
 ni envía correo a cuentas reales durante las pruebas.
 

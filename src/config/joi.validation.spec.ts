@@ -5,6 +5,25 @@ describe('recovery configuration', () => {
     JWT_SECRET: 'synthetic-test-key',
     DATABASE_URL: 'postgresql://localhost/blog_test',
   };
+  it.each([
+    'https://user:password@example.test/recuperar',
+    'https://example.test/recuperar?next=bad',
+    'https://example.test/recuperar#fragment',
+  ])('rejects unsafe recovery URL at startup: %s', (RECOVERY_URL) => {
+    for (const NODE_ENV of ['development', 'production']) {
+      expect(
+        joiValidationSchema.validate({
+          ...base,
+          NODE_ENV,
+          JWT_SECRET: 'synthetic-production-key-with-32-plus-characters',
+          MAILER_SERVICE: 'gmail',
+          MAILER_EMAIL: 'sender@example.test',
+          MAILER_SECRET_KEY: 'synthetic-secret',
+          RECOVERY_URL,
+        }).error,
+      ).toBeDefined();
+    }
+  });
   it('allows development without mail but rejects partial configuration', () => {
     expect(joiValidationSchema.validate(base).error).toBeUndefined();
     expect(
@@ -23,6 +42,35 @@ describe('recovery configuration', () => {
       }).error,
     ).toBeUndefined();
   });
+
+  it('accepts complete MAILER configuration without SMTP variables', () => {
+    expect(
+      joiValidationSchema.validate({
+        ...base,
+        NODE_ENV: 'production',
+        JWT_SECRET: 'synthetic-production-key-with-32-plus-characters',
+        MAILER_SERVICE: 'gmail',
+        MAILER_EMAIL: 'sender@example.test',
+        MAILER_SECRET_KEY: 'synthetic-mail-secret',
+        RECOVERY_URL: 'https://example.test/recuperar',
+      }).error,
+    ).toBeUndefined();
+  });
+
+  it.each(['MAILER_EMAIL', 'MAILER_SECRET_KEY', 'RECOVERY_URL'])(
+    'rejects MAILER configuration missing %s',
+    (missing) => {
+      const config: Record<string, string> = {
+        ...base,
+        MAILER_SERVICE: 'gmail',
+        MAILER_EMAIL: 'sender@example.test',
+        MAILER_SECRET_KEY: 'synthetic-mail-secret',
+        RECOVERY_URL: 'https://example.test/recuperar',
+      };
+      delete config[missing];
+      expect(joiValidationSchema.validate(config).error).toBeDefined();
+    },
+  );
   it('requires mail and an HTTPS reset URL in production', () => {
     expect(
       joiValidationSchema.validate({ ...base, NODE_ENV: 'production' }).error,

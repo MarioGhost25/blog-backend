@@ -39,7 +39,7 @@ interface Change {
 @Injectable()
 export class RealtimeGateway implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RealtimeGateway.name);
-  private server!: SocketServer;
+  private server?: SocketServer;
   private readonly connections = new Map<Socket, Connection>();
   private readonly upgrades = new Map<
     string,
@@ -88,11 +88,11 @@ export class RealtimeGateway implements OnModuleInit, OnModuleDestroy {
       );
     });
     namespace.on('connection', (socket) => {
-      const connection = socket.data.connection as Connection;
+      const connection = (socket.data as { connection: Connection }).connection;
       this.connections.set(socket, connection);
       void socket.join(`user:${connection.user.id}`);
       for (const event of ['room:join', 'room:leave'])
-        socket.on(event, (data) => {
+        socket.on(event, (data: unknown) => {
           const now = Date.now();
           if (now - connection.since > 60000) {
             connection.since = now;
@@ -219,7 +219,7 @@ export class RealtimeGateway implements OnModuleInit, OnModuleDestroy {
         .length >= 12
     )
       throw new Error('Connection limit');
-    socket.data.connection = {
+    (socket.data as { connection: Connection }).connection = {
       id: randomUUID(),
       socket,
       user,
@@ -441,6 +441,6 @@ export class RealtimeGateway implements OnModuleInit, OnModuleDestroy {
       .removePresence({ where: { conexion: { in: ids } } })
       .catch(() => undefined);
     await this.listener?.end().catch(() => undefined);
-    this.server.close();
+    await this.server?.close();
   }
 }

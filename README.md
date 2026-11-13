@@ -23,6 +23,21 @@ No compartas ni subas `.env` al repositorio.
 
 # API Endpoints
 
+Para enviar correos de recuperación, configura `MAILER_SERVICE` (nombre del
+proveedor reconocido por Nodemailer, por ejemplo `gmail`), `MAILER_EMAIL`
+(correo remitente) y `MAILER_SECRET_KEY` (credencial SMTP del proveedor).
+Agrega `RECOVERY_URL` con la URL de la página de recuperación del frontend,
+por ejemplo `http://localhost:3000/recuperar`; en producción debe usar HTTPS.
+El servicio agrega `/<token>` a esa URL. Las variables `SMTP_*` siguen
+disponibles como alternativa; si defines `MAILER_SERVICE`, se usa ese proveedor.
+
+Para comprobar conexión y credenciales sin enviar correo ni acceder a la base,
+ejecuta `npm run mail:check`. Para probar la recuperación completa, inicia backend
+y frontend, abre `http://localhost:3000/recuperar` e ingresa el correo de una
+cuenta registrada. Revisa la bandeja y spam, abre el enlace y define la nueva
+contraseña. La respuesta HTTP 202 es genérica y no confirma que se haya enviado
+un correo. La comprobación SMTP tampoco garantiza la llegada a la bandeja.
+
 ## General
 
 | Metodo | Endpoint | Descripcion |

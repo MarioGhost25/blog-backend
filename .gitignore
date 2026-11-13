@@ -2,6 +2,10 @@
 /dist
 /node_modules
 /build
+*.tsbuildinfo
+.cache/
+.npm/
+.pnpm-store/
 
 # Logs
 logs
@@ -14,10 +18,15 @@ lerna-debug.log*
 
 # OS
 .DS_Store
+Thumbs.db
+Desktop.ini
 
 # Tests
 /coverage
 /.nyc_output
+/test-results/
+/playwright-report/
+/blob-report/
 
 # IDEs and editors
 /.idea
@@ -27,6 +36,15 @@ lerna-debug.log*
 *.launch
 .settings/
 *.sublime-workspace
+*.swp
+*.swo
+*~
+
+# Local agent settings and credentials (shared skills remain versioned)
+/.codex/
+/.aws/
+/.claude/settings.local.json
+/.claude/projects/
 
 # IDE - VSCode
 .vscode/*
@@ -37,14 +55,18 @@ lerna-debug.log*
 
 # dotenv environment variable files
 .env
-.env.development.local
-.env.test.local
-.env.production.local
-.env.local
+.env.*
+!.env.template
+!.env.example
+!.env.*.template
+!.env.*.example
 
 # temp directory
 .temp
 .tmp
+.tmp-*
+/tmp/
+/temp/
 
 # Runtime data
 pids
@@ -56,3 +78,14 @@ pids
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 /src/generated/prisma
+
+# Local PostgreSQL data and backups (keep prisma/migrations versioned)
+/postgres/
+/backups/
+*.dump
+*.sql.gz
+
+# Local private keys
+*.key
+*.p12
+*.pfx

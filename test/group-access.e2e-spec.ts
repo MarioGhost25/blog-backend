@@ -1563,7 +1563,9 @@ describe('G02 roles, privacy and revocation with real PostgreSQL/HTTP', () => {
     });
     const events: { event: string; data: { room?: string; count?: number } }[] =
       [];
-    socket.onAny((event, data) => events.push({ event, data }));
+    socket.onAny((event: string, data: { room?: string; count?: number }) =>
+      events.push({ event, data }),
+    );
     const wait = (
       name: string,
       predicate: (event: (typeof events)[number]) => boolean = () => true,
